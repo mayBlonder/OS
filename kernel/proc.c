@@ -596,6 +596,26 @@ kill(int pid)
   return -1;
 }
 
+int
+pause(int seconds)
+{
+  struct proc *p;
+  uint ticks0;
+
+  for(p = proc; p < &proc[NPROC]; p++){
+    acquire(&p->lock);
+    if(p->state == RUNNING){
+      p->state = RUNNABLE
+      release(&p->lock);
+    }
+  }
+  ticks0 = ticks;
+  while(seconds - (ticks - ticks0)\10 > 0){
+  }
+    // for all previos running proccesses 
+    // p->state = RUNNING
+}
+
 // Copy to either a user address, or kernel address,
 // depending on usr_dst.
 // Returns 0 on success, -1 on error.

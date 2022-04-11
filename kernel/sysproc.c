@@ -62,6 +62,7 @@ sys_sleep(void)
     return -1;
   acquire(&tickslock);
   ticks0 = ticks;
+  
   while(ticks - ticks0 < n){
     if(myproc()->killed){
       release(&tickslock);
@@ -94,4 +95,15 @@ sys_uptime(void)
   xticks = ticks;
   release(&tickslock);
   return xticks;
+}
+
+uint64
+sys_pause(void)
+{
+  int seconds;
+
+  if(argint(0, &seconds) < 0)
+    return -1;
+
+  return pause(seconds);
 }
