@@ -62,7 +62,6 @@ procinit(void)
       // added
       p->mean_ticks = 0;
       p->last_ticks = 0;
-      // p->last_runnable_time = 100000;
   }
 }
 
@@ -448,7 +447,7 @@ FCFS_scheduler(void)
   struct proc *p;
   struct cpu *c = mycpu();
 
-  int min_last_run_time = proc->last_runnable_time;
+  uint min_last_run_time = proc->last_runnable_time;
   struct proc *p_of_min = proc;
   
   c->proc = 0;
@@ -497,7 +496,7 @@ SJF_scheduler(void)
   struct proc *p;
   struct cpu *c = mycpu();
   
-  int min_mean_ticks = proc->mean_ticks;
+  uint min_mean_ticks = proc->mean_ticks;
   struct proc *p_of_min = proc;
   
   c->proc = 0;

@@ -95,9 +95,9 @@ struct proc {
   int pid;                     // Process ID
 
   // added
-  int mean_ticks;              // mean_ticks = ((10 - rate) * mean_ticks + last_ticks * (rate)) / 10
-  int last_ticks;              // Number of ticks in the last CPU burst 
-  int last_runnable_time;
+  uint mean_ticks;              // mean_ticks = ((10 - rate) * mean_ticks + last_ticks * (rate)) / 10
+  uint last_ticks;              // Number of ticks in the last CPU burst 
+  uint last_runnable_time;
 
   // wait_lock must be held when using this:
   struct proc *parent;         // Parent process
