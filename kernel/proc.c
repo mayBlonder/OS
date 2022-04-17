@@ -62,7 +62,7 @@ procinit(void)
       // added
       p->mean_ticks = 0;
       p->last_ticks = 0;
-      p->last_runnable_time = 100000;
+      // p->last_runnable_time = 100000;
   }
 }
 
@@ -254,7 +254,7 @@ userinit(void)
 
   p->state = RUNNABLE;
   // added
-  p->last_ticks = ticks;
+  // p->last_ticks = ticks;
 
   release(&p->lock);
 }
@@ -326,7 +326,7 @@ fork(void)
   acquire(&np->lock);
   np->state = RUNNABLE;
   // added
-  np->last_ticks = ticks;
+  // np->last_ticks = ticks;
   release(&np->lock);
 
   return pid;
@@ -447,6 +447,7 @@ FCFS_scheduler(void)
 {
   struct proc *p;
   struct cpu *c = mycpu();
+
   int min_last_run_time = proc->last_runnable_time;
   struct proc *p_of_min = proc;
   
@@ -462,7 +463,10 @@ FCFS_scheduler(void)
       acquire(&p->lock);
       if(p->state == RUNNABLE) 
       {
-        if(p->last_runnable_time < min_last_run_time)
+        acquire(&tickslock);
+        p->last_ticks = ticks;
+        release(&tickslock);
+        if(p->last_runnable_time <= min_last_run_time)
         {
           min_last_run_time = p->last_runnable_time;
           p_of_min = p;
@@ -477,15 +481,13 @@ FCFS_scheduler(void)
     acquire(&p_of_min->lock);
     p_of_min->state = RUNNING;
 
-    // maybee last row
-    release(&p_of_min->lock);
     c->proc = p_of_min;
     swtch(&c->context, &p_of_min->context);
 
     // Process is done running for now.
     // It should have changed its p->state before coming back.
     c->proc = 0;
-    
+    release(&p_of_min->lock);
   }
 }
 
@@ -494,6 +496,7 @@ SJF_scheduler(void)
 {
   struct proc *p;
   struct cpu *c = mycpu();
+  
   int min_mean_ticks = proc->mean_ticks;
   struct proc *p_of_min = proc;
   
@@ -504,7 +507,7 @@ SJF_scheduler(void)
     // maybee not needed: 
     // Each process runs until it either exits or blocks (its state is changed to the
     // SLEEPING state)
-    intr_on();
+    // intr_on();
 
     // Checking which process has the lowest mean_ticks
     for(p = proc; p < &proc[NPROC]; p++) 
@@ -513,7 +516,7 @@ SJF_scheduler(void)
       if(p->state == RUNNABLE) 
       {
         p->mean_ticks = ((10 - rate) * p->mean_ticks + p->last_ticks * (rate)) / 10;
-        if(p->mean_ticks < min_mean_ticks)
+        if(p->mean_ticks <= min_mean_ticks)
         {
           min_mean_ticks = p->mean_ticks;
           p_of_min = p;
@@ -525,16 +528,16 @@ SJF_scheduler(void)
     // Switch to chosen process.  It is the process's job
     // to release its lock and then reacquire it
     // before jumping back to us.
-    acquire(&p_of_min->lock);
+    // acquire(&p_of_min->lock);
     p_of_min->state = RUNNING;
-    // maybee last row
-    release(&p_of_min->lock);
+    
     c->proc = p_of_min;
     swtch(&c->context, &p_of_min->context);
 
     // Process is done running for now.
     // It should have changed its p->state before coming back.
     c->proc = 0;
+    // release(&p_of_min->lock);
   }
 }
 
@@ -578,24 +581,19 @@ default_scheduler(void)
 }
 
 //added
-void scheduler(void)
-	{
-	  for (;;)
-	  {
-	    // Allowing devices to interrupt to avoid deadlock.
-	    intr_on();
-
-      #ifdef RR
-        default_scheduler();
-      #endif
-      #ifdef SJF
-        SJF_scheduler();
-      #endif
-      #ifdef FCFS
-        FCFS_scheduler();
-      #endif
-	    }
-	}
+void 
+scheduler(void)
+{
+  #ifdef RR
+    default_scheduler();
+  #endif
+  #ifdef SJF
+    SJF_scheduler();
+  #endif
+  #ifdef FCFS
+    FCFS_scheduler();
+  #endif
+}
 
 // Switch to scheduler.  Must hold only p->lock
 // and have changed proc->state. Saves and restores
@@ -632,7 +630,7 @@ yield(void)
   acquire(&p->lock);
   p->state = RUNNABLE;
   // added
-  p->last_ticks = ticks;
+  // p->last_ticks = ticks;
   sched();
   release(&p->lock);
 }
@@ -702,7 +700,7 @@ wakeup(void *chan)
       if(p->state == SLEEPING && p->chan == chan) {
         p->state = RUNNABLE;
         // added
-        p->last_ticks = ticks;
+        // p->last_ticks = ticks;
       }
       release(&p->lock);
     }
@@ -725,7 +723,7 @@ kill(int pid)
         // Wake process from sleep().
         p->state = RUNNABLE;
         // added
-        p->last_ticks = ticks;
+        // p->last_ticks = ticks;
       }
       release(&p->lock);
       return 0;

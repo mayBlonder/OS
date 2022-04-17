@@ -97,16 +97,17 @@ sys_uptime(void)
   return xticks;
 }
 
+
 uint64
 sys_pause(void)
 {
-  int seconds;
+//   int seconds;
 
-  if(argint(0, &seconds) < 0)
-    return -1;
+//   if(argint(0, &seconds) < 0)
+//     return -1;
 
-  // to change
+//   // to change
   return 0;
 
-//   return pause(seconds);
+// //   return pause(seconds);
 }
