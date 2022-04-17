@@ -462,9 +462,9 @@ FCFS_scheduler(void)
       acquire(&p->lock);
       if(p->state == RUNNABLE) 
       {
-        acquire(&tickslock);
-        p->last_ticks = ticks;
-        release(&tickslock);
+        // acquire(&tickslock);
+        // p->last_ticks = ticks;
+        // release(&tickslock);
         if(p->last_runnable_time <= min_last_run_time)
         {
           min_last_run_time = p->last_runnable_time;
@@ -506,7 +506,7 @@ SJF_scheduler(void)
     // maybee not needed: 
     // Each process runs until it either exits or blocks (its state is changed to the
     // SLEEPING state)
-    // intr_on();
+    intr_on();
 
     // Checking which process has the lowest mean_ticks
     for(p = proc; p < &proc[NPROC]; p++) 
@@ -527,7 +527,8 @@ SJF_scheduler(void)
     // Switch to chosen process.  It is the process's job
     // to release its lock and then reacquire it
     // before jumping back to us.
-    // acquire(&p_of_min->lock);
+    
+    acquire(&p_of_min->lock);
     p_of_min->state = RUNNING;
     
     c->proc = p_of_min;
@@ -536,7 +537,7 @@ SJF_scheduler(void)
     // Process is done running for now.
     // It should have changed its p->state before coming back.
     c->proc = 0;
-    // release(&p_of_min->lock);
+    release(&p_of_min->lock);
   }
 }
 
@@ -629,7 +630,7 @@ yield(void)
   acquire(&p->lock);
   p->state = RUNNABLE;
   // added
-  // p->last_ticks = ticks;
+  p->last_ticks = ticks;
   sched();
   release(&p->lock);
 }
@@ -699,7 +700,7 @@ wakeup(void *chan)
       if(p->state == SLEEPING && p->chan == chan) {
         p->state = RUNNABLE;
         // added
-        // p->last_ticks = ticks;
+        p->last_ticks = ticks;
       }
       release(&p->lock);
     }
@@ -722,7 +723,7 @@ kill(int pid)
         // Wake process from sleep().
         p->state = RUNNABLE;
         // added
-        // p->last_ticks = ticks;
+        p->last_ticks = ticks;
       }
       release(&p->lock);
       return 0;
