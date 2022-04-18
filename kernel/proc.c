@@ -58,10 +58,6 @@ procinit(void)
   for(p = proc; p < &proc[NPROC]; p++) {
       initlock(&p->lock, "proc");
       p->kstack = KSTACK((int) (p - proc));
-
-      // added
-      p->mean_ticks = 0;
-      p->last_ticks = 0;
   }
 }
 
@@ -128,6 +124,10 @@ allocproc(void)
 found:
   p->pid = allocpid();
   p->state = USED;
+
+  // added
+  p->mean_ticks = 0;
+  p->last_ticks = 0;
 
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
@@ -253,7 +253,8 @@ userinit(void)
 
   p->state = RUNNABLE;
   // added
-  // p->last_ticks = ticks;
+  p->last_ticks = ticks;
+  p->mean_ticks = ((10 - rate) * p->mean_ticks + p->last_ticks * (rate)) / 10;
 
   release(&p->lock);
 }
@@ -325,7 +326,8 @@ fork(void)
   acquire(&np->lock);
   np->state = RUNNABLE;
   // added
-  // np->last_ticks = ticks;
+  np->last_ticks = ticks;
+  np->mean_ticks = ((10 - rate) * np->mean_ticks + np->last_ticks * (rate)) / 10;
   release(&np->lock);
 
   return pid;
@@ -514,7 +516,7 @@ SJF_scheduler(void)
       acquire(&p->lock);
       if(p->state == RUNNABLE) 
       {
-        p->mean_ticks = ((10 - rate) * p->mean_ticks + p->last_ticks * (rate)) / 10;
+        // p->mean_ticks = ((10 - rate) * p->mean_ticks + p->last_ticks * (rate)) / 10;
         if(p->mean_ticks <= min_mean_ticks)
         {
           min_mean_ticks = p->mean_ticks;
@@ -584,13 +586,18 @@ default_scheduler(void)
 void 
 scheduler(void)
 {
-  #ifdef RR
-    default_scheduler();
-  #endif
   #ifdef SJF
+    printf("sjf\n");
     SJF_scheduler();
   #endif
+  
+  #ifdef RR
+    printf("RR\n");
+    default_scheduler();
+  #endif
+  
   #ifdef FCFS
+    printf("fcfs\n");
     FCFS_scheduler();
   #endif
 }
@@ -631,6 +638,7 @@ yield(void)
   p->state = RUNNABLE;
   // added
   p->last_ticks = ticks;
+  p->mean_ticks = ((10 - rate) * p->mean_ticks + p->last_ticks * (rate)) / 10;
   sched();
   release(&p->lock);
 }
@@ -701,6 +709,7 @@ wakeup(void *chan)
         p->state = RUNNABLE;
         // added
         p->last_ticks = ticks;
+        p->mean_ticks = ((10 - rate) * p->mean_ticks + p->last_ticks * (rate)) / 10;
       }
       release(&p->lock);
     }
@@ -724,6 +733,7 @@ kill(int pid)
         p->state = RUNNABLE;
         // added
         p->last_ticks = ticks;
+        p->mean_ticks = ((10 - rate) * p->mean_ticks + p->last_ticks * (rate)) / 10;
       }
       release(&p->lock);
       return 0;
@@ -744,16 +754,18 @@ pause(int seconds)
 
   // for(p = proc; p < &proc[NPROC]; p++){
   //   acquire(&p->lock);
-  //   if(p->state == RUNNING){
+  //   if(p->state == RUNNING)
+  //   {
   //     p->state = RUNNABLE;
-  //     // added
   //     p->last_ticks = ticks;
-  //     release(&p->lock);
   //   }
+  //   release(&p->lock);
   // }
   // ticks0 = ticks;
   // while(seconds - (ticks - ticks0)/10 > 0){
   // }
+
+
     // for all previos running proccesses 
     // p->state = RUNNING
 }

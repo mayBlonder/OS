@@ -78,6 +78,18 @@ usertrap(void)
 
   // give up the CPU if this is a timer interrupt.
   if(which_dev == 2)
+  // {
+  //   #ifdef RR
+  //     struct proc *p = myproc();
+  //     acquire(&p->lock);
+  //     p->state = RUNNABLE;
+  //     // added
+  //     p->last_ticks = ticks;
+  //     p->mean_ticks = ((10 - rate) * p->mean_ticks + p->last_ticks * (rate)) / 10;
+  //     sched();
+  //     release(&p->lock);
+  //   #endif
+  // }
     yield();
 
   usertrapret();
@@ -138,8 +150,9 @@ kerneltrap()
   uint64 sstatus = r_sstatus();
   uint64 scause = r_scause();
   
-  if((sstatus & SSTATUS_SPP) == 0)
+  if((sstatus & SSTATUS_SPP) == 0){
     panic("kerneltrap: not from supervisor mode");
+    }
   if(intr_get() != 0)
     panic("kerneltrap: interrupts enabled");
 
@@ -151,6 +164,18 @@ kerneltrap()
 
   // give up the CPU if this is a timer interrupt.
   if(which_dev == 2 && myproc() != 0 && myproc()->state == RUNNING)
+  // {
+  //   #ifdef RR
+  //     struct proc *p = myproc();
+  //     acquire(&p->lock);
+  //     p->state = RUNNABLE;
+  //     // added
+  //     p->last_ticks = ticks;
+  //     p->mean_ticks = ((10 - rate) * p->mean_ticks + p->last_ticks * (rate)) / 10;
+  //     sched();
+  //     release(&p->lock);
+  //   #endif
+  // }
     yield();
 
   // the yield() may have caused some traps to occur,

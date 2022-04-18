@@ -50,6 +50,7 @@ endif
 
 # added
 ifndef SCHEDFLAG
+# should be RR\ DEFAULT ?
 SCHEDFLAG := DEFAULT
 endif
 
@@ -71,6 +72,7 @@ CFLAGS += $(shell $(CC) -fno-stack-protector -E -x c /dev/null >/dev/null 2>&1 &
 
 # added
 CFLAGS += -D $(SCHEDFLAG)
+
 
 # Disable PIE when possible (for Ubuntu 16.10 toolchain)
 ifneq ($(shell $(CC) -dumpspecs 2>/dev/null | grep -e '[^f]no-pie'),)
@@ -141,6 +143,7 @@ UPROGS=\
 	$U/_grind\
 	$U/_wc\
 	$U/_zombie\
+
 
 fs.img: mkfs/mkfs README $(UPROGS)
 	mkfs/mkfs fs.img README $(UPROGS)
