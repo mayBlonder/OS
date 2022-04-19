@@ -447,12 +447,12 @@ FCFS_scheduler(void)
 {
   struct proc *p;
   struct cpu *c = mycpu();
+  int should_switch = 0;
+  c->proc = 0;
 
   uint min_last_run_time = proc->last_runnable_time;
   struct proc *p_of_min = proc;
-  int should_switch = 0;
   
-  c->proc = 0;
   for(;;)
   {
     // Avoiding deadlock by ensuring that devices can interrupt.
@@ -464,7 +464,9 @@ FCFS_scheduler(void)
       acquire(&p->lock);
       if(p->state == RUNNABLE) 
       {
-        if(p->last_runnable_time < min_last_run_time)
+        // TODO: only initcode, pid = 1 is RUNNABLE for some reason...
+        printf("name: %s, pid: %d\n", p_of_min->name, p_of_min->pid);
+        if(p->last_runnable_time <= min_last_run_time)
         {
           min_last_run_time = p->last_runnable_time;
           p_of_min = p;
@@ -511,9 +513,6 @@ SJF_scheduler(void)
   for(;;)
   {
     // TODO: Avoiding deadlock by ensuring that devices can interrupt.
-    // maybee not needed: 
-    // Each process runs until it either exits or blocks (its state is changed to the
-    // SLEEPING state)
     intr_on();
 
     // Checking which process has the lowest mean_ticks
@@ -539,7 +538,8 @@ SJF_scheduler(void)
     acquire(&p_of_min->lock);
     if (p_of_min->paused == 0)
     {
-      if (should_switch == 1){
+      if (should_switch == 1)
+      {
         printf("name: %s, pid: %d\n", p_of_min->name, p_of_min->pid);
         p_of_min->state = RUNNING;
         c->proc = p_of_min;
