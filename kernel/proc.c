@@ -450,6 +450,7 @@ FCFS_scheduler(void)
 
   uint min_last_run_time = proc->last_runnable_time;
   struct proc *p_of_min = proc;
+  int should_switch = 0;
   
   c->proc = 0;
   for(;;)
@@ -463,10 +464,11 @@ FCFS_scheduler(void)
       acquire(&p->lock);
       if(p->state == RUNNABLE) 
       {
-        if(p->last_runnable_time <= min_last_run_time)
+        if(p->last_runnable_time < min_last_run_time)
         {
           min_last_run_time = p->last_runnable_time;
           p_of_min = p;
+          should_switch = 1;
         }
       }
       release(&p->lock);
@@ -478,13 +480,18 @@ FCFS_scheduler(void)
     acquire(&p_of_min->lock);
     if (p_of_min->paused == 0)
     {
-      p_of_min->state = RUNNING;
-      c->proc = p_of_min;
-      swtch(&c->context, &p_of_min->context);
+      if (should_switch == 1)
+      {
+        printf("name: %s, pid: %d\n", p_of_min->name, p_of_min->pid);
+        p_of_min->state = RUNNING;
+        c->proc = p_of_min;
+        swtch(&c->context, &p_of_min->context);
 
-      // Process is done running for now.
-      // It should have changed its p->state before coming back.
-      c->proc = 0;
+        // Process is done running for now.
+        // It should have changed its p->state before coming back.
+        c->proc = 0;
+        should_switch = 0;
+      }
     }
     release(&p_of_min->lock);
   }
@@ -498,6 +505,7 @@ SJF_scheduler(void)
   
   uint min_mean_ticks = proc->mean_ticks;
   struct proc *p_of_min = proc;
+  int should_switch = 0;
   
   c->proc = 0;
   for(;;)
@@ -511,15 +519,14 @@ SJF_scheduler(void)
     // Checking which process has the lowest mean_ticks
     for(p = proc; p < &proc[NPROC]; p++) 
     {
-      printf("name: %s, pid: %d\n", p->name, p->pid);
       acquire(&p->lock);
       if(p->state == RUNNABLE) 
       {
-        // p->mean_ticks = ((10 - rate) * p->mean_ticks + p->last_ticks * (rate)) / 10;
         if(p->mean_ticks <= min_mean_ticks)
         {
           min_mean_ticks = p->mean_ticks;
           p_of_min = p;
+          should_switch = 1;
         }
       }
       release(&p->lock);
@@ -532,18 +539,22 @@ SJF_scheduler(void)
     acquire(&p_of_min->lock);
     if (p_of_min->paused == 0)
     {
-      p_of_min->state = RUNNING;
-      c->proc = p_of_min;
-      uint before_context_switch = ticks;
-      swtch(&c->context, &p_of_min->context);
-      uint mean_ticks = p_of_min->mean_ticks;
-      uint last_ticks = p_of_min->last_ticks;
-      p_of_min->mean_ticks = ((10 - rate) * mean_ticks + last_ticks * (rate)) / 10;
-      p_of_min->last_ticks = ticks - before_context_switch;
+      if (should_switch == 1){
+        printf("name: %s, pid: %d\n", p_of_min->name, p_of_min->pid);
+        p_of_min->state = RUNNING;
+        c->proc = p_of_min;
+        uint before_context_switch = ticks;
+        swtch(&c->context, &p_of_min->context);
+        uint mean_ticks = p_of_min->mean_ticks;
+        uint last_ticks = p_of_min->last_ticks;
+        p_of_min->mean_ticks = ((10 - rate) * mean_ticks + last_ticks * (rate)) / 10;
+        p_of_min->last_ticks = ticks - before_context_switch;
 
-      // Process is done running for now.
-      // It should have changed its p->state before coming back.
-      c->proc = 0;
+        // Process is done running for now.
+        // It should have changed its p->state before coming back.
+        c->proc = 0;
+        should_switch = 0;
+      }
     }
     release(&p_of_min->lock);
   }
