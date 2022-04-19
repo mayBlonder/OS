@@ -98,6 +98,7 @@ struct proc {
   uint mean_ticks;              // mean_ticks = ((10 - rate) * mean_ticks + last_ticks * (rate)) / 10
   uint last_ticks;              // Number of ticks in the last CPU burst 
   uint last_runnable_time;
+  int paused;
 
   // wait_lock must be held when using this:
   struct proc *parent;         // Parent process

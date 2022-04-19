@@ -128,6 +128,7 @@ found:
   // added
   p->mean_ticks = 0;
   p->last_ticks = 0;
+  p->paused = 0;
 
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
@@ -255,6 +256,7 @@ userinit(void)
   // added
   p->last_ticks = ticks;
   p->mean_ticks = ((10 - rate) * p->mean_ticks + p->last_ticks * (rate)) / 10;
+  p->last_runnable_time = ticks;
 
   release(&p->lock);
 }
@@ -328,6 +330,7 @@ fork(void)
   // added
   np->last_ticks = ticks;
   np->mean_ticks = ((10 - rate) * np->mean_ticks + np->last_ticks * (rate)) / 10;
+  np->last_runnable_time = ticks;
   release(&np->lock);
 
   return pid;
@@ -464,9 +467,6 @@ FCFS_scheduler(void)
       acquire(&p->lock);
       if(p->state == RUNNABLE) 
       {
-        // acquire(&tickslock);
-        // p->last_ticks = ticks;
-        // release(&tickslock);
         if(p->last_runnable_time <= min_last_run_time)
         {
           min_last_run_time = p->last_runnable_time;
@@ -480,14 +480,16 @@ FCFS_scheduler(void)
     // to release its lock and then reacquire it
     // before jumping back to us.
     acquire(&p_of_min->lock);
-    p_of_min->state = RUNNING;
+    if (p_of_min->paused == 0)
+    {
+      p_of_min->state = RUNNING;
+      c->proc = p_of_min;
+      swtch(&c->context, &p_of_min->context);
 
-    c->proc = p_of_min;
-    swtch(&c->context, &p_of_min->context);
-
-    // Process is done running for now.
-    // It should have changed its p->state before coming back.
-    c->proc = 0;
+      // Process is done running for now.
+      // It should have changed its p->state before coming back.
+      c->proc = 0;
+    }
     release(&p_of_min->lock);
   }
 }
@@ -513,6 +515,7 @@ SJF_scheduler(void)
     // Checking which process has the lowest mean_ticks
     for(p = proc; p < &proc[NPROC]; p++) 
     {
+      printf("name: %s, pid: %d\n", p->name, p->pid);
       acquire(&p->lock);
       if(p->state == RUNNABLE) 
       {
@@ -565,6 +568,7 @@ default_scheduler(void)
     for(p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);
       if(p->state == RUNNABLE) {
+        printf("name: %s, pid: %d\n", p->name, p->pid);
 
         // Switch to chosen process.  It is the process's job
         // to release its lock and then reacquire it
@@ -639,6 +643,7 @@ yield(void)
   // added
   p->last_ticks = ticks;
   p->mean_ticks = ((10 - rate) * p->mean_ticks + p->last_ticks * (rate)) / 10;
+  p->last_runnable_time = ticks;
   sched();
   release(&p->lock);
 }
@@ -710,6 +715,7 @@ wakeup(void *chan)
         // added
         p->last_ticks = ticks;
         p->mean_ticks = ((10 - rate) * p->mean_ticks + p->last_ticks * (rate)) / 10;
+        p->last_runnable_time = ticks;
       }
       release(&p->lock);
     }
@@ -734,6 +740,7 @@ kill(int pid)
         // added
         p->last_ticks = ticks;
         p->mean_ticks = ((10 - rate) * p->mean_ticks + p->last_ticks * (rate)) / 10;
+        p->last_runnable_time = ticks;
       }
       release(&p->lock);
       return 0;
@@ -758,6 +765,7 @@ pause(int seconds)
   //   {
   //     p->state = RUNNABLE;
   //     p->last_ticks = ticks;
+        //  p->last_runnable_time = ticks;
   //   }
   //   release(&p->lock);
   // }
