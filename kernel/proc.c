@@ -254,8 +254,6 @@ userinit(void)
 
   p->state = RUNNABLE;
   // added
-  p->last_ticks = ticks;
-  p->mean_ticks = ((10 - rate) * p->mean_ticks + p->last_ticks * (rate)) / 10;
   p->last_runnable_time = ticks;
 
   release(&p->lock);
@@ -328,8 +326,6 @@ fork(void)
   acquire(&np->lock);
   np->state = RUNNABLE;
   // added
-  np->last_ticks = ticks;
-  np->mean_ticks = ((10 - rate) * np->mean_ticks + np->last_ticks * (rate)) / 10;
   np->last_runnable_time = ticks;
   release(&np->lock);
 
@@ -534,14 +530,21 @@ SJF_scheduler(void)
     // before jumping back to us.
     
     acquire(&p_of_min->lock);
-    p_of_min->state = RUNNING;
-    
-    c->proc = p_of_min;
-    swtch(&c->context, &p_of_min->context);
+    if (p_of_min->paused == 0)
+    {
+      p_of_min->state = RUNNING;
+      c->proc = p_of_min;
+      uint before_context_switch = ticks;
+      swtch(&c->context, &p_of_min->context);
+      uint mean_ticks = p_of_min->mean_ticks;
+      uint last_ticks = p_of_min->last_ticks;
+      p_of_min->mean_ticks = ((10 - rate) * mean_ticks + last_ticks * (rate)) / 10;
+      p_of_min->last_ticks = ticks - before_context_switch;
 
-    // Process is done running for now.
-    // It should have changed its p->state before coming back.
-    c->proc = 0;
+      // Process is done running for now.
+      // It should have changed its p->state before coming back.
+      c->proc = 0;
+    }
     release(&p_of_min->lock);
   }
 }
@@ -641,8 +644,6 @@ yield(void)
   acquire(&p->lock);
   p->state = RUNNABLE;
   // added
-  p->last_ticks = ticks;
-  p->mean_ticks = ((10 - rate) * p->mean_ticks + p->last_ticks * (rate)) / 10;
   p->last_runnable_time = ticks;
   sched();
   release(&p->lock);
@@ -713,8 +714,6 @@ wakeup(void *chan)
       if(p->state == SLEEPING && p->chan == chan) {
         p->state = RUNNABLE;
         // added
-        p->last_ticks = ticks;
-        p->mean_ticks = ((10 - rate) * p->mean_ticks + p->last_ticks * (rate)) / 10;
         p->last_runnable_time = ticks;
       }
       release(&p->lock);
@@ -738,8 +737,6 @@ kill(int pid)
         // Wake process from sleep().
         p->state = RUNNABLE;
         // added
-        p->last_ticks = ticks;
-        p->mean_ticks = ((10 - rate) * p->mean_ticks + p->last_ticks * (rate)) / 10;
         p->last_runnable_time = ticks;
       }
       release(&p->lock);
