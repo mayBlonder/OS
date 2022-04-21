@@ -109,3 +109,11 @@ sys_pause(void)
   return 0;
   // return pause(seconds);
 }
+
+
+uint64
+sys_kill_all(void)
+{
+  return kill_system(); 
+}
+

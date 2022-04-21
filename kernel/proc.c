@@ -6,6 +6,7 @@
 #include "proc.h"
 #include "defs.h"
 
+
 int rate;
 
 struct cpu cpus[NCPU];
@@ -759,7 +760,7 @@ kill(int pid)
 }
 
 int
-pause(int seconds)
+pause_system(int seconds)
 {
   // to change
   return 0;
@@ -789,6 +790,38 @@ pause(int seconds)
 // Copy to either a user address, or kernel address,
 // depending on usr_dst.
 // Returns 0 on success, -1 on error.
+int
+str_compare(const char *p1, const char *p2)
+{
+  const unsigned char *s1 = (const unsigned char *) p1;
+  const unsigned char *s2 = (const unsigned char *) p2;
+  unsigned char c1, c2;
+  do
+    {
+      c1 = (unsigned char) *s1++;
+      c2 = (unsigned char) *s2++;
+      if (c1 == '\0')
+        return c1 - c2;
+    }
+  while (c1 == c2);
+  return c1 - c2;
+}
+
+int
+kill_system(void) 
+{
+  struct proc *p;
+
+  for (p = proc; p < &proc[NPROC]; p++) {
+    if ( str_compare(p->name, "init") != 0 && str_compare(p->name, "sh") != 0 ) {
+      if (p != myproc()) {
+        kill(p->pid);      
+      }
+    }
+  }
+  return 0;
+}
+
 int
 either_copyout(int user_dst, uint64 dst, void *src, uint64 len)
 {
