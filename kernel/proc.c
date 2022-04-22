@@ -583,7 +583,7 @@ default_scheduler(void)
     for(p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);
       if(p->state == RUNNABLE) {
-        printf("name: %s, pid: %d\n", p->name, p->pid);
+        // printf("name: %s, pid: %d\n", p->name, p->pid);
 
         // Switch to chosen process.  It is the process's job
         // to release its lock and then reacquire it
@@ -811,13 +811,17 @@ int
 kill_system(void) 
 {
   struct proc *p;
+  struct proc *myProcess = myproc();
 
   for (p = proc; p < &proc[NPROC]; p++) {
     if ( str_compare(p->name, "init") != 0 && str_compare(p->name, "sh") != 0 ) {
-      if (p != myproc()) {
+      if (p != myProcess) {
         kill(p->pid);      
       }
     }
+  }
+  if ( str_compare(myProcess->name, "init") != 0 && str_compare(myProcess->name, "sh") != 0 ) {
+    kill(myProcess->pid);
   }
   return 0;
 }
