@@ -444,6 +444,21 @@ wait(uint64 addr)
   }
 }
 
+void
+unpause_system(void)
+{
+  struct proc *p;
+  for(p = proc; p < &proc[NPROC]; p++) 
+  {
+      acquire(&p->lock);
+      if(p->paused == 1) 
+      {
+        p->paused = 0;
+      }
+      release(&p->lock);
+  }
+} 
+
 
 void
 FCFS_scheduler(void)
@@ -499,6 +514,15 @@ FCFS_scheduler(void)
       }
     }
     release(&p_of_min->lock);
+
+    if (pause_flag == 1) 
+    {
+      if (wake_up_time <= ticks) 
+      {
+        pause_flag = 0;
+        unpause_system();
+      }
+    }
   }
 }
 
@@ -560,21 +584,15 @@ SJF_scheduler(void)
       }
     }
     release(&p_of_min->lock);
-  }
-}
 
-void
-unpause_system(void)
-{
-  struct proc *p;
-  for(p = proc; p < &proc[NPROC]; p++) 
-  {
-      acquire(&p->lock);
-      if(p->paused == 1) 
+    if (pause_flag == 1) 
+    {
+      if (wake_up_time <= ticks) 
       {
-        p->paused = 0;
+        pause_flag = 0;
+        unpause_system();
       }
-      release(&p->lock);
+    }
   }
 }
 
@@ -615,10 +633,8 @@ default_scheduler(void)
       }
       release(&p->lock);
     }
-    // printf("p_flag: %d\n", pause_flag);
     if (pause_flag == 1) 
     {
-      // printf("wake_up_time : %d <= ticks: %d\n",  wake_up_time, ticks);
       if (wake_up_time <= ticks) 
       {
         pause_flag = 0;
