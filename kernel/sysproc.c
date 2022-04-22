@@ -106,8 +106,7 @@ sys_pause_system(void)
   if(argint(0, &seconds) < 0)
     return -1;
 
-  return 0;
-  // return pause(seconds);
+  return pause_system(seconds);
 }
 
 

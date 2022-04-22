@@ -8,6 +8,8 @@
 
 
 int rate;
+int pause_flag = 0;
+uint wake_up_time;
 
 struct cpu cpus[NCPU];
 
@@ -121,7 +123,7 @@ allocproc(void)
     }
   }
   return 0;
-
+// uint ticks0;
 found:
   p->pid = allocpid();
   p->state = USED;
@@ -561,6 +563,21 @@ SJF_scheduler(void)
   }
 }
 
+void
+unpause_system(void)
+{
+  struct proc *p;
+  for(p = proc; p < &proc[NPROC]; p++) 
+  {
+      acquire(&p->lock);
+      if(p->paused == 1) 
+      {
+        p->paused = 0;
+      }
+      release(&p->lock);
+  }
+}
+
 // Per-CPU process scheduler.
 // Each CPU calls scheduler() after setting itself up.
 // Scheduler never returns.  It loops, doing:
@@ -582,7 +599,7 @@ default_scheduler(void)
 
     for(p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);
-      if(p->state == RUNNABLE) {
+      if(p->state == RUNNABLE && p->paused == 0) {
         // printf("name: %s, pid: %d\n", p->name, p->pid);
 
         // Switch to chosen process.  It is the process's job
@@ -597,6 +614,16 @@ default_scheduler(void)
         c->proc = 0;
       }
       release(&p->lock);
+    }
+    // printf("p_flag: %d\n", pause_flag);
+    if (pause_flag == 1) 
+    {
+      // printf("wake_up_time : %d <= ticks: %d\n",  wake_up_time, ticks);
+      if (wake_up_time <= ticks) 
+      {
+        pause_flag = 0;
+        unpause_system();
+      }
     }
   }
 }
@@ -760,37 +787,6 @@ kill(int pid)
 }
 
 int
-pause_system(int seconds)
-{
-  // to change
-  return 0;
-
-  // struct proc *p;
-  // uint ticks0;
-
-  // for(p = proc; p < &proc[NPROC]; p++){
-  //   acquire(&p->lock);
-  //   if(p->state == RUNNING)
-  //   {
-  //     p->state = RUNNABLE;
-  //     p->last_ticks = ticks;
-        //  p->last_runnable_time = ticks;
-  //   }
-  //   release(&p->lock);
-  // }
-  // ticks0 = ticks;
-  // while(seconds - (ticks - ticks0)/10 > 0){
-  // }
-
-
-    // for all previos running proccesses 
-    // p->state = RUNNING
-}
-
-// Copy to either a user address, or kernel address,
-// depending on usr_dst.
-// Returns 0 on success, -1 on error.
-int
 str_compare(const char *p1, const char *p2)
 {
   const unsigned char *s1 = (const unsigned char *) p1;
@@ -806,6 +802,48 @@ str_compare(const char *p1, const char *p2)
   while (c1 == c2);
   return c1 - c2;
 }
+
+int
+pause_system(int seconds)
+{
+  struct proc *p;
+  struct proc *myProcess = myproc();
+
+  printf("changed flag to 1\n");
+  pause_flag = 1;
+
+  printf("finished pause_system."); 
+  wake_up_time = ticks + (seconds * 10);
+  printf("wake_up_time : %d",  wake_up_time);
+
+  for(p = proc; p < &proc[NPROC]; p++)
+  {
+    acquire(&p->lock);
+    if(p->state == RUNNING)
+    {
+      if ( str_compare(p->name, "init") != 0 && str_compare(p->name, "sh") != 0 ) {
+        if (p != myProcess) {
+          p->paused = 1;
+          yield();
+        }
+      }
+    }
+    release(&p->lock);
+  }
+  if ( str_compare(myProcess->name, "init") != 0 && str_compare(myProcess->name, "sh") != 0 ) 
+  {
+    acquire(&myProcess->lock);
+    myProcess->paused = 1;
+    release(&myProcess->lock);
+    yield();
+  }
+  return 0;
+}
+
+
+// Copy to either a user address, or kernel address,
+// depending on usr_dst.
+// Returns 0 on success, -1 on error.
 
 int
 kill_system(void) 
