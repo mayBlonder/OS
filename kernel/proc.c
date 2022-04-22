@@ -465,12 +465,10 @@ FCFS_scheduler(void)
 {
   struct proc *p;
   struct cpu *c = mycpu();
+  struct proc *p_of_min = proc;
   int should_switch = 0;
   c->proc = 0;
 
-  uint min_last_run_time = proc->last_runnable_time;
-  struct proc *p_of_min = proc;
-  
   for(;;)
   {
     // Avoiding deadlock by ensuring that devices can interrupt.
@@ -480,13 +478,11 @@ FCFS_scheduler(void)
     for(p = proc; p < &proc[NPROC]; p++) 
     {
       acquire(&p->lock);
-      if(p->state == RUNNABLE) 
+      // printf("state: %d, pid: %d\n", p->state, p->pid);
+      if(p->state == RUNNABLE && p->paused == 0) 
       {
-        // TODO: only initcode, pid = 1 is RUNNABLE for some reason...
-        printf("name: %s, pid: %d\n", p_of_min->name, p_of_min->pid);
-        if(p->last_runnable_time <= min_last_run_time)
+        if(p->last_runnable_time <= p_of_min->last_runnable_time)
         {
-          min_last_run_time = p->last_runnable_time;
           p_of_min = p;
           should_switch = 1;
         }
@@ -498,7 +494,8 @@ FCFS_scheduler(void)
     // to release its lock and then reacquire it
     // before jumping back to us.
     acquire(&p_of_min->lock);
-    if (p_of_min->paused == 0)
+
+    if (p_of_min->paused == 0 && p_of_min->pid != -1)
     {
       if (should_switch == 1)
       {
@@ -545,8 +542,9 @@ SJF_scheduler(void)
     // Checking which process has the lowest mean_ticks
     for(p = proc; p < &proc[NPROC]; p++) 
     {
+      // printf("state: %d, pid: %d\n", p->state, p->pid);
       acquire(&p->lock);
-      if(p->state == RUNNABLE) 
+      if(p->state == RUNNABLE && p->paused == 0) 
       {
         if(p->mean_ticks <= min_mean_ticks)
         {
@@ -565,7 +563,7 @@ SJF_scheduler(void)
     acquire(&p_of_min->lock);
     if (p_of_min->paused == 0)
     {
-      if (should_switch == 1)
+      if (should_switch == 1 && p_of_min->pid != -1)
       {
         printf("name: %s, pid: %d\n", p_of_min->name, p_of_min->pid);
         p_of_min->state = RUNNING;
@@ -648,6 +646,11 @@ default_scheduler(void)
 void 
 scheduler(void)
 {
+  #ifdef FCFS
+    printf("fcfs\n");
+    FCFS_scheduler();
+  #endif
+
   #ifdef SJF
     printf("sjf\n");
     SJF_scheduler();
@@ -658,10 +661,7 @@ scheduler(void)
     default_scheduler();
   #endif
   
-  #ifdef FCFS
-    printf("fcfs\n");
-    FCFS_scheduler();
-  #endif
+  
 }
 
 // Switch to scheduler.  Must hold only p->lock
