@@ -518,60 +518,59 @@ unpause_system(void)
   }
 } 
 
-
 void
 FCFS_scheduler(void)
 {
   struct proc *p;
   struct cpu *c = mycpu();
   struct proc *p_of_min = proc;
-  int should_switch = 0;
   c->proc = 0;
-
-  for(;;)
+  
+  for (;;)
   {
-    // Avoiding deadlock by ensuring that devices can interrupt.
+    // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
-
-    // Checking which process has the lowest last_runnable_time
-    for(p = proc; p < &proc[NPROC]; p++) 
+    for (p = proc; p < &proc[NPROC]; p++)
     {
       acquire(&p->lock);
-      if(p->state == RUNNABLE && p->paused == 0) 
+      if (p->paused == 0) 
       {
-        if(p->last_runnable_time <= p_of_min->last_runnable_time)
+        if (p->state == RUNNABLE)
         {
-          p_of_min = p;
-          should_switch = 1;
+          if (p->last_runnable_time <= p_of_min->last_runnable_time)
+          {
+            p_of_min = p;
+          }
         }
       }
       release(&p->lock);
     }
-
-    // Switch to chosen process.  It is the process's job
-    // to release its lock and then reacquire it
-    // before jumping back to us.
     acquire(&p_of_min->lock);
-
-    if (p_of_min->paused == 0 && p_of_min->pid != -1)
+    if (p_of_min->paused == 0 && p_of_min->state == RUNNABLE)
     {
-      if (should_switch == 1)
-      {
+      if (p_of_min->pid > -1) 
+      { 
+        printf("pid: %d\n", p_of_min->pid);
         p_of_min->state = RUNNING;
         p_of_min->start_running_time = ticks;
         p_of_min->runnable_time += ticks - p_of_min->last_runnable_time;
 
         c->proc = p_of_min;
+        uint before_context_switch = ticks;
         swtch(&c->context, &p_of_min->context);
+
+        uint mean_ticks = p_of_min->mean_ticks;
+        uint last_ticks = p_of_min->last_ticks;
+        p_of_min->mean_ticks = ((10 - rate) * mean_ticks + last_ticks * (rate)) / 10;	
+        p_of_min->last_ticks = ticks - before_context_switch; 
 
         // Process is done running for now.
         // It should have changed its p->state before coming back.
         c->proc = 0;
-        should_switch = 0;
       }
     }
     release(&p_of_min->lock);
-
+      
     if (pause_flag == 1) 
     {
       if (wake_up_time <= ticks) 
@@ -582,6 +581,7 @@ FCFS_scheduler(void)
     }
   }
 }
+
 
 void
 SJF_scheduler(void)
@@ -622,7 +622,7 @@ SJF_scheduler(void)
     acquire(&p_of_min->lock);
     if (p_of_min->paused == 0)
     {
-      if (should_switch == 1 && p_of_min->pid != -1)
+      if (should_switch == 1 && p_of_min->pid > -1)
       {
         p_of_min->state = RUNNING;
         p_of_min->start_running_time = ticks;
