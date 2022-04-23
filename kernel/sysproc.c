@@ -97,6 +97,12 @@ sys_uptime(void)
   return xticks;
 }
 
+uint64
+sys_print_stats(void)
+{
+  return print_stats();
+}
+
 
 uint64
 sys_pause_system(void)

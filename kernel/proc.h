@@ -100,6 +100,13 @@ struct proc {
   uint last_runnable_time;
   int paused;
 
+  // statistics
+  uint running_time;
+  uint runnable_time;
+  uint sleeping_time; 
+  uint start_running_time;
+  uint start_sleeping_time; 
+
   // wait_lock must be held when using this:
   struct proc *parent;         // Parent process
 

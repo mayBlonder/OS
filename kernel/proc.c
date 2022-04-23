@@ -10,6 +10,13 @@
 int rate;
 int pause_flag = 0;
 uint wake_up_time;
+uint sleeping_processes_mean;
+uint running_processes_mean;
+uint runnable_processes_mean;
+int p_counter = 0;
+uint program_time;
+uint start_time;
+int cpu_utilization;
 
 struct cpu cpus[NCPU];
 
@@ -51,8 +58,14 @@ proc_mapstacks(pagetable_t kpgtbl) {
 void
 procinit(void)
 {
-  // added
+  // Added
   rate = 5;
+  sleeping_processes_mean = 0;
+  running_processes_mean = 0;
+  runnable_processes_mean = 0;
+  program_time = 0;
+  cpu_utilization = 0;
+  start_time = ticks;
 
   struct proc *p;
   
@@ -132,6 +145,10 @@ found:
   p->mean_ticks = 0;
   p->last_ticks = 0;
   p->paused = 0;
+
+  p->sleeping_time = 0;
+  p->running_time = 0;
+  p->runnable_time = 0;
 
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
@@ -233,6 +250,24 @@ uchar initcode[] = {
   0x74, 0x00, 0x00, 0x24, 0x00, 0x00, 0x00, 0x00,
   0x00, 0x00, 0x00, 0x00
 };
+
+
+int
+str_compare(const char *p1, const char *p2)
+{
+  const unsigned char *s1 = (const unsigned char *) p1;
+  const unsigned char *s2 = (const unsigned char *) p2;
+  unsigned char c1, c2;
+  do
+    {
+      c1 = (unsigned char) *s1++;
+      c2 = (unsigned char) *s2++;
+      if (c1 == '\0')
+        return c1 - c2;
+    }
+  while (c1 == c2);
+  return c1 - c2;
+}
 
 // Set up first user process.
 void
@@ -370,6 +405,21 @@ exit(int status)
     }
   }
 
+  // Update
+  sleeping_processes_mean = ((sleeping_processes_mean * p_counter)+ p->sleeping_time)/(p_counter+1);
+  running_processes_mean = ((running_processes_mean * p_counter)+ p->running_time)/(p_counter+1);
+  runnable_processes_mean = ((runnable_processes_mean * p_counter)+ p->runnable_time)/(p_counter+1);
+  p_counter += 1;
+
+  if ( str_compare(p->name, "init") != 0 && str_compare(p->name, "sh") != 0 ) 
+  {
+    program_time += p->running_time;
+  }
+
+  cpu_utilization = program_time / (ticks - start_time);
+
+  //
+
   begin_op();
   iput(p->cwd);
   end_op();
@@ -501,6 +551,8 @@ FCFS_scheduler(void)
       {
         printf("name: %s, pid: %d\n", p_of_min->name, p_of_min->pid);
         p_of_min->state = RUNNING;
+        p_of_min->start_running_time = ticks;
+
         c->proc = p_of_min;
         swtch(&c->context, &p_of_min->context);
 
@@ -567,6 +619,7 @@ SJF_scheduler(void)
       {
         printf("name: %s, pid: %d\n", p_of_min->name, p_of_min->pid);
         p_of_min->state = RUNNING;
+        p_of_min->start_running_time = ticks;
         c->proc = p_of_min;
         uint before_context_switch = ticks;
         swtch(&c->context, &p_of_min->context);
@@ -621,7 +674,13 @@ default_scheduler(void)
         // Switch to chosen process.  It is the process's job
         // to release its lock and then reacquire it
         // before jumping back to us.
+
+        p->runnable_time += ticks - p->last_runnable_time;
+
         p->state = RUNNING;
+
+        p->start_running_time = ticks;
+
         c->proc = p;
         swtch(&c->context, &p->context);
 
@@ -745,6 +804,7 @@ sleep(void *chan, struct spinlock *lk)
   // Go to sleep.
   p->chan = chan;
   p->state = SLEEPING;
+  p->start_sleeping_time = ticks;
 
   sched();
 
@@ -768,6 +828,7 @@ wakeup(void *chan)
       acquire(&p->lock);
       if(p->state == SLEEPING && p->chan == chan) {
         p->state = RUNNABLE;
+        p->sleeping_time += ticks - p->start_sleeping_time;
         // added
         p->last_runnable_time = ticks;
       }
@@ -791,6 +852,7 @@ kill(int pid)
       if(p->state == SLEEPING){
         // Wake process from sleep().
         p->state = RUNNABLE;
+        p->sleeping_time += ticks - p->start_sleeping_time;
         // added
         p->last_runnable_time = ticks;
       }
@@ -802,22 +864,18 @@ kill(int pid)
   return -1;
 }
 
-int
-str_compare(const char *p1, const char *p2)
+int 
+print_stats(void)
 {
-  const unsigned char *s1 = (const unsigned char *) p1;
-  const unsigned char *s2 = (const unsigned char *) p2;
-  unsigned char c1, c2;
-  do
-    {
-      c1 = (unsigned char) *s1++;
-      c2 = (unsigned char) *s2++;
-      if (c1 == '\0')
-        return c1 - c2;
-    }
-  while (c1 == c2);
-  return c1 - c2;
+  printf("sleeping_processes_mean: %d\n", sleeping_processes_mean);
+  printf("runnable_processes_mean: %d\n", runnable_processes_mean);
+  printf("running_processes_mean: %d\n", running_processes_mean);
+  printf("program_time: %d\n", program_time);
+  printf("cpu_utilization: %d\n", cpu_utilization);
+  printf("ticks: %d\n", ticks);
+  return 0;
 }
+
 
 int
 pause_system(int seconds)
@@ -840,6 +898,7 @@ pause_system(int seconds)
       if ( str_compare(p->name, "init") != 0 && str_compare(p->name, "sh") != 0 ) {
         if (p != myProcess) {
           p->paused = 1;
+          p->running_time += ticks - p->start_running_time;
           yield();
         }
       }
