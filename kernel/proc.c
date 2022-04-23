@@ -7,12 +7,12 @@
 #include "defs.h"
 
 
-int rate;
+int rate = 5;
 int pause_flag = 0;
 uint wake_up_time;
-uint sleeping_processes_mean;
-uint running_processes_mean;
-uint runnable_processes_mean;
+uint sleeping_processes_mean = 0;
+uint running_processes_mean= 0;
+uint runnable_processes_mean = 0;
 int p_counter = 0;
 uint program_time;
 uint start_time;
@@ -59,10 +59,6 @@ void
 procinit(void)
 {
   // Added
-  rate = 5;
-  sleeping_processes_mean = 0;
-  running_processes_mean = 0;
-  runnable_processes_mean = 0;
   program_time = 0;
   cpu_utilization = 0;
   start_time = ticks;
@@ -405,19 +401,18 @@ exit(int status)
     }
   }
 
-  // Update
-  sleeping_processes_mean = ((sleeping_processes_mean * p_counter)+ p->sleeping_time)/(p_counter+1);
-  running_processes_mean = ((running_processes_mean * p_counter)+ p->running_time)/(p_counter+1);
-  runnable_processes_mean = ((runnable_processes_mean * p_counter)+ p->runnable_time)/(p_counter+1);
-  p_counter += 1;
+  
 
   if ( str_compare(p->name, "init") != 0 && str_compare(p->name, "sh") != 0 ) 
   {
+    // Update
+    sleeping_processes_mean = ((sleeping_processes_mean * p_counter)+ p->sleeping_time)/(p_counter+1);
+    running_processes_mean = ((running_processes_mean * p_counter)+ p->running_time)/(p_counter+1);
+    runnable_processes_mean = ((runnable_processes_mean * p_counter)+ p->runnable_time)/(p_counter+1);
+    p_counter += 1;
     program_time += p->running_time;
+    cpu_utilization = program_time / (ticks - start_time);
   }
-
-  cpu_utilization = program_time / (ticks - start_time);
-
   //
 
   begin_op();
@@ -488,6 +483,20 @@ wait(uint64 addr)
       release(&wait_lock);
       return -1;
     }
+
+    // added
+    if (p->state == RUNNING)
+    {
+      p->running_time += ticks - p->start_running_time;
+    }
+     if (p->state == RUNNABLE)
+    {
+      p->runnable_time += ticks - p->last_runnable_time;
+    }
+    if (p->state == SLEEPING)
+    {
+      p->sleeping_time += ticks - p->start_sleeping_time;
+    }
     
     // Wait for a child to exit.
     sleep(p, &wait_lock);  //DOC: wait-sleep
@@ -528,7 +537,6 @@ FCFS_scheduler(void)
     for(p = proc; p < &proc[NPROC]; p++) 
     {
       acquire(&p->lock);
-      // printf("state: %d, pid: %d\n", p->state, p->pid);
       if(p->state == RUNNABLE && p->paused == 0) 
       {
         if(p->last_runnable_time <= p_of_min->last_runnable_time)
@@ -549,9 +557,9 @@ FCFS_scheduler(void)
     {
       if (should_switch == 1)
       {
-        printf("name: %s, pid: %d\n", p_of_min->name, p_of_min->pid);
         p_of_min->state = RUNNING;
         p_of_min->start_running_time = ticks;
+        p_of_min->runnable_time += ticks - p_of_min->last_runnable_time;
 
         c->proc = p_of_min;
         swtch(&c->context, &p_of_min->context);
@@ -594,7 +602,6 @@ SJF_scheduler(void)
     // Checking which process has the lowest mean_ticks
     for(p = proc; p < &proc[NPROC]; p++) 
     {
-      // printf("state: %d, pid: %d\n", p->state, p->pid);
       acquire(&p->lock);
       if(p->state == RUNNABLE && p->paused == 0) 
       {
@@ -617,9 +624,10 @@ SJF_scheduler(void)
     {
       if (should_switch == 1 && p_of_min->pid != -1)
       {
-        printf("name: %s, pid: %d\n", p_of_min->name, p_of_min->pid);
         p_of_min->state = RUNNING;
         p_of_min->start_running_time = ticks;
+        p_of_min->runnable_time += ticks - p_of_min->last_runnable_time;
+        // printf("###############%d\n", p_of_min->runnable_time);
         c->proc = p_of_min;
         uint before_context_switch = ticks;
         swtch(&c->context, &p_of_min->context);
@@ -669,7 +677,6 @@ default_scheduler(void)
     for(p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);
       if(p->state == RUNNABLE && p->paused == 0) {
-        // printf("name: %s, pid: %d\n", p->name, p->pid);
 
         // Switch to chosen process.  It is the process's job
         // to release its lock and then reacquire it
@@ -706,17 +713,14 @@ void
 scheduler(void)
 {
   #ifdef FCFS
-    printf("fcfs\n");
     FCFS_scheduler();
   #endif
 
   #ifdef SJF
-    printf("sjf\n");
     SJF_scheduler();
   #endif
   
   #ifdef RR
-    printf("RR\n");
     default_scheduler();
   #endif
   
@@ -883,12 +887,9 @@ pause_system(int seconds)
   struct proc *p;
   struct proc *myProcess = myproc();
 
-  printf("changed flag to 1\n");
   pause_flag = 1;
 
-  printf("finished pause_system."); 
   wake_up_time = ticks + (seconds * 10);
-  printf("wake_up_time : %d",  wake_up_time);
 
   for(p = proc; p < &proc[NPROC]; p++)
   {
@@ -909,6 +910,7 @@ pause_system(int seconds)
   {
     acquire(&myProcess->lock);
     myProcess->paused = 1;
+    myProcess->running_time += ticks - myProcess->start_running_time;
     release(&myProcess->lock);
     yield();
   }
