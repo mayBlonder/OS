@@ -411,7 +411,7 @@ exit(int status)
     runnable_processes_mean = ((runnable_processes_mean * p_counter)+ p->runnable_time)/(p_counter+1);
     p_counter += 1;
     program_time += p->running_time;
-    cpu_utilization = (program_time / (ticks - start_time)) * 100;
+    cpu_utilization = (program_time* 100) / (ticks - start_time) ;
   }
   //
 
