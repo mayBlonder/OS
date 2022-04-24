@@ -411,7 +411,7 @@ exit(int status)
     runnable_processes_mean = ((runnable_processes_mean * p_counter)+ p->runnable_time)/(p_counter+1);
     p_counter += 1;
     program_time += p->running_time;
-    cpu_utilization = program_time / (ticks - start_time);
+    cpu_utilization = (program_time / (ticks - start_time)) * 100;
   }
   //
 
@@ -525,6 +525,7 @@ FCFS_scheduler(void)
   struct cpu *c = mycpu();
   struct proc *p_of_min = proc;
   c->proc = 0;
+  int should_switch = 0;
   
   for (;;)
   {
@@ -539,7 +540,9 @@ FCFS_scheduler(void)
         {
           if (p->last_runnable_time <= p_of_min->last_runnable_time)
           {
+            printf("switch\n");
             p_of_min = p;
+            should_switch = 1;
           }
         }
       }
@@ -548,8 +551,9 @@ FCFS_scheduler(void)
     acquire(&p_of_min->lock);
     if (p_of_min->paused == 0 && p_of_min->state == RUNNABLE)
     {
-      if (p_of_min->pid > -1) 
+      if (p_of_min->pid > -1 && should_switch == 1) 
       { 
+        should_switch = 0;
         printf("pid: %d\n", p_of_min->pid);
         p_of_min->state = RUNNING;
         p_of_min->start_running_time = ticks;
