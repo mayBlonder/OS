@@ -5,6 +5,7 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
+#include <limits.h>
 
 
 int rate = 5;
@@ -433,6 +434,9 @@ exit(int status)
   p->xstate = status;
   p->state = ZOMBIE;
 
+  // added
+  p->running_time += ticks - p->start_running_time;
+
   release(&wait_lock);
 
   // Jump into the scheduler, never to return.
@@ -519,62 +523,57 @@ unpause_system(void)
 } 
 
 void
-FCFS_scheduler(void)
+SJF_scheduler(void)
 {
   struct proc *p;
   struct cpu *c = mycpu();
-  struct proc *p_of_min = proc;
+ 
   c->proc = 0;
-  int should_switch = 0;
-  
-  for (;;)
-  {
+
+  for(;;){
+
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
-    for (p = proc; p < &proc[NPROC]; p++)
-    {
-      acquire(&p->lock);
-      if (p->paused == 0) 
-      {
-        if (p->state == RUNNABLE)
-        {
-          if (p->last_runnable_time <= p_of_min->last_runnable_time)
-          {
-            printf("switch\n");
-            p_of_min = p;
-            should_switch = 1;
-          }
-        }
-      }
-      release(&p->lock);
+   
+    uint min = INT_MAX;
+    struct proc* p_of_min = proc;
+    int should_switch = 0;
+
+    // for to find the runnable with min mean ticks
+    for(p = proc; p < &proc[NPROC]; p++) {
+         
+       if(p->state == RUNNABLE) {
+         if (p->mean_ticks < min)
+         {
+           p_of_min = p;
+           min = p->mean_ticks;
+           should_switch = 1;
+         }
+       }
     }
+
+    // Switch to chosen process.  It is the process's job
+    // to release its lock and then reacquire it
+    // before jumping back to us.
+
     acquire(&p_of_min->lock);
-    if (p_of_min->paused == 0 && p_of_min->state == RUNNABLE)
-    {
-      if (p_of_min->pid > -1 && should_switch == 1) 
-      { 
-        should_switch = 0;
-        printf("pid: %d\n", p_of_min->pid);
-        p_of_min->state = RUNNING;
-        p_of_min->start_running_time = ticks;
-        p_of_min->runnable_time += ticks - p_of_min->last_runnable_time;
-
-        c->proc = p_of_min;
-        uint before_context_switch = ticks;
-        swtch(&c->context, &p_of_min->context);
-
-        uint mean_ticks = p_of_min->mean_ticks;
-        uint last_ticks = p_of_min->last_ticks;
-        p_of_min->mean_ticks = ((10 - rate) * mean_ticks + last_ticks * (rate)) / 10;	
-        p_of_min->last_ticks = ticks - before_context_switch; 
-
-        // Process is done running for now.
-        // It should have changed its p->state before coming back.
-        c->proc = 0;
-      }
+    if (should_switch == 1 && p_of_min->state == RUNNABLE && p_of_min->paused == 0){
+      should_switch = 0;
+      p_of_min->state = RUNNING;
+      p_of_min->start_running_time = ticks;
+      p_of_min->runnable_time += ticks - p_of_min->last_runnable_time;
+      c->proc = p_of_min;
+      uint before_swtch = ticks;
+      swtch(&c->context, &p_of_min->context);
+      p_of_min->last_ticks= ticks - before_swtch;
+      p_of_min->mean_ticks=((10 - rate) * p->mean_ticks + p->last_ticks * (rate)) / 10 ;
+      
+      // Process is done running for now.
+      // It should have changed its p->state before coming back.
+      c->proc = 0;
     }
     release(&p_of_min->lock);
-      
+
     if (pause_flag == 1) 
     {
       if (wake_up_time <= ticks) 
@@ -588,7 +587,7 @@ FCFS_scheduler(void)
 
 
 void
-SJF_scheduler(void)
+FCFS_scheduler(void)
 {
   struct proc *p;
   struct cpu *c = mycpu();
@@ -631,7 +630,6 @@ SJF_scheduler(void)
         p_of_min->state = RUNNING;
         p_of_min->start_running_time = ticks;
         p_of_min->runnable_time += ticks - p_of_min->last_runnable_time;
-        // printf("###############%d\n", p_of_min->runnable_time);
         c->proc = p_of_min;
         uint before_context_switch = ticks;
         swtch(&c->context, &p_of_min->context);
