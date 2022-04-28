@@ -592,8 +592,7 @@ FCFS_scheduler(void)
   struct proc *p;
   struct cpu *c = mycpu();
   
-  uint min_mean_ticks = proc->mean_ticks;
-  struct proc *p_of_min = proc;
+ 
   int should_switch = 0;
   
   c->proc = 0;
@@ -602,15 +601,18 @@ FCFS_scheduler(void)
     // TODO: Avoiding deadlock by ensuring that devices can interrupt.
     intr_on();
 
+    uint minlast_runnable = INT_MAX;
+    struct proc *p_of_min = proc;
+
     // Checking which process has the lowest mean_ticks
     for(p = proc; p < &proc[NPROC]; p++) 
     {
       acquire(&p->lock);
       if(p->state == RUNNABLE && p->paused == 0) 
       {
-        if(p->mean_ticks <= min_mean_ticks)
+        if(p->last_runnable_time <= minlast_runnable)
         {
-          min_mean_ticks = p->mean_ticks;
+          minlast_runnable = p->mean_ticks;
           p_of_min = p;
           should_switch = 1;
         }
@@ -631,12 +633,7 @@ FCFS_scheduler(void)
         p_of_min->start_running_time = ticks;
         p_of_min->runnable_time += ticks - p_of_min->last_runnable_time;
         c->proc = p_of_min;
-        uint before_context_switch = ticks;
         swtch(&c->context, &p_of_min->context);
-        uint mean_ticks = p_of_min->mean_ticks;
-        uint last_ticks = p_of_min->last_ticks;
-        p_of_min->mean_ticks = ((10 - rate) * mean_ticks + last_ticks * (rate)) / 10;
-        p_of_min->last_ticks = ticks - before_context_switch;
 
         // Process is done running for now.
         // It should have changed its p->state before coming back.
