@@ -66,6 +66,8 @@ procinit(void)
   cpu_utilization = 0;
   start_time = ticks;
 
+  // TODO: add all to UNUSED.
+
   struct proc *p;
   
   initlock(&pid_lock, "nextpid");
@@ -141,6 +143,7 @@ allocpid() {
 static struct proc*
 allocproc(void)
 {
+  // TODO: choose UNUSED process.
   struct proc *p;
 
   for(p = proc; p < &proc[NPROC]; p++) {
@@ -197,6 +200,7 @@ found:
 static void
 freeproc(struct proc *p)
 {
+  // TODO: remove from ZOMBIE list and add to UNUSED.
   if(p->trapframe)
     kfree((void*)p->trapframe);
   p->trapframe = 0;
@@ -290,6 +294,7 @@ str_compare(const char *p1, const char *p2)
 void
 userinit(void)
 {
+  // TODO: add init to 1st cpu list.
   struct proc *p;
 
   p = allocproc();
@@ -339,6 +344,8 @@ growproc(int n)
 int
 fork(void)
 {
+
+  // TODO: add to RUNNABLE list.
   int i, pid;
   struct proc *np;
   struct proc *p = myproc();
@@ -408,6 +415,7 @@ reparent(struct proc *p)
 void
 exit(int status)
 {
+  // TODO: remove from RUNNABLE list and add to ZOMBIE
   struct proc *p = myproc();
 
   if(p == initproc)
@@ -682,9 +690,10 @@ FCFS_scheduler(void)
 //  - eventually that process transfers control
 //    via swtch back to the scheduler.
 void
-// changed from: scheduler(void)
-default_scheduler(void)
+scheduler(void)
+// default_scheduler(void)
 {
+  // TODO: pick first process from list.
   struct proc *p;
   struct cpu *c = mycpu();
   
@@ -728,23 +737,23 @@ default_scheduler(void)
 }
 
 //added
-void 
-scheduler(void)
-{
-  #ifdef FCFS
-    FCFS_scheduler();
-  #endif
+// void 
+// scheduler(void)
+// {
+//   #ifdef FCFS
+//     FCFS_scheduler();
+//   #endif
 
-  #ifdef SJF
-    SJF_scheduler();
-  #endif
+//   #ifdef SJF
+//     SJF_scheduler();
+//   #endif
   
-  #ifdef RR
-    default_scheduler();
-  #endif
+//   #ifdef RR
+//     default_scheduler();
+//   #endif
   
   
-}
+// }
 
 // Switch to scheduler.  Must hold only p->lock
 // and have changed proc->state. Saves and restores
@@ -777,6 +786,7 @@ sched(void)
 void
 yield(void)
 {
+  // TODOL add to RUNNABLE list.
   struct proc *p = myproc();
   acquire(&p->lock);
   p->state = RUNNABLE;
@@ -812,6 +822,7 @@ forkret(void)
 void
 sleep(void *chan, struct spinlock *lk)
 {
+  // TODO: remove from RUNNABLE and add to SLEEPING
   struct proc *p = myproc();
   
   // Must acquire p->lock in order to
@@ -844,6 +855,7 @@ sleep(void *chan, struct spinlock *lk)
 void
 wakeup(void *chan)
 {
+  // TODO: go threw all SLEEPING and pick one to wake up- remove from SLEEPING and add to RUNNABLE.
   struct proc *p;
 
   for(p = proc; p < &proc[NPROC]; p++) {

@@ -28,6 +28,7 @@ struct cpu {
 
   // Ass2
   // TODO: Add here RUNNABLE list?
+  //  int cpu_num; ?
 };
 
 extern struct cpu cpus[NCPU];
