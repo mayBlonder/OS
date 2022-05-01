@@ -109,6 +109,10 @@ int             pause_system(int seconds);
 int             kill_system(void);
 int             print_stats(void);
 
+// Ass2
+int             set_cpu(int cpu_num);
+int             get_cpu(void);
+
 
 // swtch.S
 void            swtch(struct context*, struct context*);

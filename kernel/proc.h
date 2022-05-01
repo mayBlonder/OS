@@ -25,6 +25,9 @@ struct cpu {
   struct context context;     // swtch() here to enter scheduler().
   int noff;                   // Depth of push_off() nesting.
   int intena;                 // Were interrupts enabled before push_off()?
+
+  // Ass2
+  // TODO: Add here RUNNABLE list?
 };
 
 extern struct cpu cpus[NCPU];
@@ -94,18 +97,21 @@ struct proc {
   int xstate;                  // Exit status to be returned to parent's wait
   int pid;                     // Process ID
 
-  // added
+  // Ass1
   uint mean_ticks;              // mean_ticks = ((10 - rate) * mean_ticks + last_ticks * (rate)) / 10
   uint last_ticks;              // Number of ticks in the last CPU burst 
   uint last_runnable_time;
   int paused;
 
-  // statistics
+    // statistics
   uint running_time;
   uint runnable_time;
   uint sleeping_time; 
   uint start_running_time;
   uint start_sleeping_time; 
+
+  // Ass2
+  int cpu_num;
 
   // wait_lock must be held when using this:
   struct proc *parent;         // Parent process

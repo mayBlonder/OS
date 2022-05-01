@@ -103,6 +103,25 @@ sys_print_stats(void)
   return print_stats();
 }
 
+// Ass2
+uint64
+sys_get_cpu(void)
+{
+  return get_cpu();
+}
+
+// Ass2
+uint64
+sys_set_cpu(void)
+{
+  int cpu_num;
+  if(argint(0, &cpu_num) < 0)
+    return -1;
+
+  return set_cpu(cpu_num);
+}
+
+
 
 uint64
 sys_pause_system(void)

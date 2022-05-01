@@ -618,7 +618,7 @@ FCFS_scheduler(void)
   c->proc = 0;
   for(;;)
   {
-    // TODO: Avoiding deadlock by ensuring that devices can interrupt.
+    // Avoiding deadlock by ensuring that devices can interrupt.
     intr_on();
 
     uint minlast_runnable = INT_MAX;
@@ -896,6 +896,22 @@ print_stats(void)
   printf("program_time: %d\n", program_time);
   printf("cpu_utilization: %d\n", cpu_utilization);
   printf("ticks: %d\n", ticks);
+  return 0;
+}
+
+// Ass2
+int
+set_cpu(int cpu_num)
+{
+  // TODO
+  return 0;
+}
+
+
+int
+get_cpu()
+{
+  // TODO
   return 0;
 }
 

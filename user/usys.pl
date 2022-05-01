@@ -39,3 +39,5 @@ entry("uptime");
 entry("pause_system");
 entry("kill_system");
 entry("print_stats");
+entry("get_cpu");
+entry("set_cpu");
