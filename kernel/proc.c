@@ -39,6 +39,8 @@ extern char trampoline[]; // trampoline.S
 // must be acquired before any p->lock.
 struct spinlock wait_lock;
 
+extern uint64 cas( volatile void *addr, int expected, int newval);
+
 // Allocate a page for each process's kernel stack.
 // Map it high in memory, followed by an invalid
 // guard page.
@@ -103,16 +105,33 @@ myproc(void) {
   return p;
 }
 
+
+// Changed !
+
+// int
+// allocpid() {
+//   int pid;
+  
+//   acquire(&pid_lock);
+//   pid = nextpid;
+//   nextpid = nextpid + 1;
+//   release(&pid_lock);
+
+//   return pid;
+// }
+
 int
 allocpid() {
   int pid;
   
-  acquire(&pid_lock);
   pid = nextpid;
-  nextpid = nextpid + 1;
-  release(&pid_lock);
+  // printf("pid: %d, nextpid: %d\n", pid, nextpid);
 
-  return pid;
+  if (cas(&nextpid, pid, (nextpid + 1)) == 0)
+  {
+    return pid;
+  }
+  return allocpid();
 }
 
 // Look in the process table for an UNUSED proc.
@@ -133,9 +152,10 @@ allocproc(void)
     }
   }
   return 0;
-// uint ticks0;
+
 found:
   p->pid = allocpid();
+
   p->state = USED;
 
   // added
