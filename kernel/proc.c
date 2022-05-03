@@ -206,18 +206,6 @@ allocpid() {
   return allocpid();
 }
 
-// int
-// alloccpuid() {
-//   int cpuid;
-  
-//   cpuid = nextcpuid;
-
-//   if (cas(&nextcpuid, cpuid, (nextcpuid + 1)) == 0)
-//   {
-//     return cpuid;
-//   }
-//   return alloccpuid();
-// }
 
 // Look in the process table for an UNUSED proc.
 // If found, initialize state required to run in the kernel,
@@ -231,7 +219,7 @@ allocproc(void)
 
   // Ass2
   printf("unused_list_head: %d\n", unused_list_head);
-  if (unused_list_head != -1)
+  if (unused_list_head > -1)
   {
     p = &proc[unused_list_head];
     acquire(&p->lock);
@@ -286,10 +274,14 @@ found:
   p->runnable_time = 0;
 
 
+  // int i=0;
+
+
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
     freeproc(p);
     release(&p->lock);
+    // i++;
     return 0;
   }
 
@@ -298,6 +290,7 @@ found:
   if(p->pagetable == 0){
     freeproc(p);
     release(&p->lock);
+    // i++;
     return 0;
   }
 
@@ -307,6 +300,8 @@ found:
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
 
+  // if (i == 0)
+  //   release(&p->lock);
   return p;
 }
 
@@ -1194,27 +1189,27 @@ wakeup(void *chan)
 
     add_proc_to_list(cpus[p->cpu_num].runnable_list_tail, p);
     if (cpus[p->cpu_num].runnable_list_head == -1)
-      {
-        cpus[p->cpu_num].runnable_list_head = p->proc_ind;
-      }
+    {
+      cpus[p->cpu_num].runnable_list_head = p->proc_ind;
+    }
     cpus[p->cpu_num].runnable_list_tail = p->proc_ind;
 
     printf("tail: %d\n", cpus[p->cpu_num].runnable_list_tail);
     printf("end wakeup\n");
 
 
-  for(p = proc; p < &proc[NPROC]; p++) {
-    if(p != myproc()){
-      acquire(&p->lock);
-      if(p->state == SLEEPING && p->chan == chan) {
-        p->state = RUNNABLE;
-        p->sleeping_time += ticks - p->start_sleeping_time;
-        // added
-        p->last_runnable_time = ticks;
-      }
-      release(&p->lock);
-    }
-  }
+  // for(p = proc; p < &proc[NPROC]; p++) {
+  //   if(p != myproc()){
+  //     acquire(&p->lock);
+  //     if(p->state == SLEEPING && p->chan == chan) {
+  //       p->state = RUNNABLE;
+  //       p->sleeping_time += ticks - p->start_sleeping_time;
+  //       // added
+  //       p->last_runnable_time = ticks;
+  //     }
+  //     release(&p->lock);
+  //   }
+  // }
 }
 
 // Kill the process with the given pid.
