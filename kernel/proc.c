@@ -61,6 +61,7 @@ add_proc_to_list(int tail, struct proc *p)
   if (cas(&proc[tail].next_proc, p_before, p->proc_ind) == 0)
   {
     p->prev_proc = tail;
+    p->next_proc = -1;
     printf("&&&&&&&&&&&&&&&adding: %d,     prev:   %d,   next:  %d\n", p->proc_ind, p->prev_proc, p->next_proc);
     return 0;
   }
@@ -111,54 +112,89 @@ proc_mapstacks(pagetable_t kpgtbl) {
   }
 }
 
+
 // initialize the proc table at boot time.
-void
-procinit(void)
-{
-  // Added
-  program_time = 0;
-  cpu_utilization = 0;
-  start_time = ticks;
-  int i = 0;
+	void
+	procinit(void)
+	{
+	  struct proc *p;
+    int i = 0;
+	  
+	  initlock(&pid_lock, "nextpid");
+	  initlock(&wait_lock, "wait_lock");
+	  for(p = proc; p < &proc[NPROC]; p++) {
+	      initlock(&p->lock, "proc");
+	      p->kstack = KSTACK((int) (p - proc));
 
-  // TODO: add all to UNUSED.
-
-  struct proc *p;
-  
-  initlock(&pid_lock, "nextpid");
-  initlock(&wait_lock, "wait_lock");
-
-  unused_list_head = proc->proc_ind;
-  proc->prev_proc = -1;
-  unused_list_tail = proc->proc_ind;
-  for(p = proc; p < &proc[NPROC]; p++) {
-      initlock(&p->lock, "proc");
-      p->kstack = KSTACK((int) (p - proc));
-
-      //Ass2
-      p->proc_ind = i;                               // Set index to process.
-      p->prev_proc = -1;
-      p->next_proc = -1;
-      if (i != 0)
-      {
-        printf("unused");
-        add_proc_to_list(unused_list_tail, p);
-         if (unused_list_head == -1)
+        p->proc_ind = i;                               // Set index to process.
+        p->prev_proc = -1;
+        p->next_proc = -1;
+        if (i != 0)
         {
-          unused_list_head = p->proc_ind;
+          printf("unused");
+          add_proc_to_list(unused_list_tail, p);
+          if (unused_list_head == -1)
+          {
+            unused_list_head = p->proc_ind;
+          }
+            unused_list_tail = p->proc_ind;             // After adding to list, updating tail.
         }
-          unused_list_tail = p->proc_ind;             // After adding to list, updating tail.
+        i ++;
       }
-      i ++;
-  }
   struct cpu *c;
   for(c = cpus; c < &cpus[NCPU]; c++)
   {
     c->runnable_list_head = -1;
     c->runnable_list_tail = -1;
   }
-
 }
+// void
+// procinit(void)
+// {
+//   // Added
+//   program_time = 0;
+//   cpu_utilization = 0;
+//   start_time = ticks;
+//   // int i = 0;
+
+//   // TODO: add all to UNUSED.
+
+//   struct proc *p;
+  
+//   initlock(&pid_lock, "nextpid");
+//   initlock(&wait_lock, "wait_lock");
+
+//   unused_list_head = proc->proc_ind;
+//   proc->prev_proc = -1;
+//   unused_list_tail = proc->proc_ind;
+//   for(p = proc; p < &proc[NPROC]; p++) {
+//       initlock(&p->lock, "proc");
+//       p->kstack = KSTACK((int) (p - proc));
+
+//       //Ass2
+//       p->proc_ind = i;                               // Set index to process.
+//       p->prev_proc = -1;
+//       p->next_proc = -1;
+//       if (i != 0)
+//       {
+//         printf("unused");
+//         add_proc_to_list(unused_list_tail, p);
+//          if (unused_list_head == -1)
+//         {
+//           unused_list_head = p->proc_ind;
+//         }
+//           unused_list_tail = p->proc_ind;             // After adding to list, updating tail.
+//       }
+//       i ++;
+//   }
+//   struct cpu *c;
+//   for(c = cpus; c < &cpus[NCPU]; c++)
+//   {
+//     c->runnable_list_head = -1;
+//     c->runnable_list_tail = -1;
+//   }
+
+// }
 
 // Must be called with interrupts disabled,
 // to prevent race with process being moved
