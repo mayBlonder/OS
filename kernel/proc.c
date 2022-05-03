@@ -56,11 +56,12 @@ extern uint64 cas( volatile void *addr, int expected, int newval);
 int
 add_proc_to_list(int tail, struct proc *p)
 {
-  printf("&&&&&&&&&&&&&&&adding: %d\n", p->proc_ind);
+  printf("&&&&&&&&&&&&&&&adding: %d,     prev:   %d,   next:  %d\n", p->proc_ind, p->prev_proc, p->next_proc);
   int p_before = proc[tail].next_proc;
   if (cas(&proc[tail].next_proc, p_before, p->proc_ind) == 0)
   {
     p->prev_proc = tail;
+    printf("&&&&&&&&&&&&&&&adding: %d,     prev:   %d,   next:  %d\n", p->proc_ind, p->prev_proc, p->next_proc);
     return 0;
   }
   return -1;
@@ -86,7 +87,9 @@ remove_proc_from_list(int ind)
   int prev = proc[p->prev_proc].next_proc;
   if (cas(&proc[p->prev_proc].next_proc, prev, p->next_proc) == 0)
   {
-    proc[p->next_proc].prev_proc = proc[p->prev_proc].proc_ind;
+    proc[p->next_proc].prev_proc = p->prev_proc;
+
+    printf("######### remove cur: %d,    prev: %d, next: %d   \n", ind, p->prev_proc, p->next_proc);
     return 0;
   }
   return -1;
@@ -134,18 +137,27 @@ procinit(void)
 
       //Ass2
       p->proc_ind = i;                               // Set index to process.
+      p->prev_proc = -1;
+      p->next_proc = -1;
       if (i != 0)
       {
         printf("unused");
         add_proc_to_list(unused_list_tail, p);
          if (unused_list_head == -1)
-      {
-        unused_list_head = p->proc_ind;
-      }
-        unused_list_tail = p->proc_ind;             // After adding to list, updating tail.
+        {
+          unused_list_head = p->proc_ind;
+        }
+          unused_list_tail = p->proc_ind;             // After adding to list, updating tail.
       }
       i ++;
   }
+  struct cpu *c;
+  for(c = cpus; c < &cpus[NCPU]; c++)
+  {
+    c->runnable_list_head = -1;
+    c->runnable_list_tail = -1;
+  }
+
 }
 
 // Must be called with interrupts disabled,
@@ -459,7 +471,9 @@ userinit(void)
   p->last_runnable_time = ticks;
   
   //Ass2
-  if (mycpu()->runnable_list_head == -1){
+  if (mycpu()->runnable_list_head == -1)
+  {
+    printf("init runnable: %d\n", p->proc_ind);
     mycpu()->runnable_list_head = p->proc_ind;
     mycpu()->runnable_list_tail = p->proc_ind;
   }
@@ -467,10 +481,7 @@ userinit(void)
   {
     printf("runnable");
     add_proc_to_list(mycpu()->runnable_list_tail, p);
-    // if (mycpu()->runnable_list_head == -1)
-    // {
-    //   mycpu()->runnable_list_head = p->proc_ind;
-    // }
+    mycpu()->runnable_list_tail = p->proc_ind;
   }
 
   release(&p->lock);
@@ -549,16 +560,13 @@ fork(void)
 
   // Ass2
   if (mycpu()->runnable_list_head == -1){
+    printf("init runnable %d\n", p->proc_ind);
     mycpu()->runnable_list_head = np->proc_ind;
     mycpu()->runnable_list_tail = np->proc_ind;
   }
   else{
     printf("runnable");
     add_proc_to_list(mycpu()->runnable_list_tail, np);
-    if (mycpu()->runnable_list_head == -1)
-    {
-      mycpu()->runnable_list_head = np->proc_ind;
-    }
     mycpu()->runnable_list_tail = np->proc_ind;
   }
 
@@ -943,16 +951,17 @@ scheduler(void)
       swtch(&c->context, &p->context);
 
       printf("runable");
-      add_proc_to_list(c->runnable_list_tail, p);
       if (c->runnable_list_head == -1)
       {
+        printf("init runnable %d\n", p->proc_ind);
         c->runnable_list_head = p->proc_ind;
+        c->runnable_list_tail = p->proc_ind;
       }
-      c->runnable_list_tail = p->proc_ind;
-      if (c->runnable_list_head == -1)
-      {
-        c->runnable_list_head = p->proc_ind;
+      else{
+        add_proc_to_list(c->runnable_list_tail, p);
+        c->runnable_list_tail = p->proc_ind;
       }
+     
       printf("added back: %d\n", c->runnable_list_tail);
 
       // Process is done running for now.
@@ -960,7 +969,7 @@ scheduler(void)
       c->proc = 0;
       release(&p->lock);
 
-      // printf("end sched\n");
+      printf("end sched\n");
     }
   }
 }
@@ -1072,6 +1081,7 @@ yield(void)
   //Ass2
    if (mycpu()->runnable_list_head == -1)
    {
+     printf("init runnable : %d", p->proc_ind);
     mycpu()->runnable_list_head = p->proc_ind;
     mycpu()->runnable_list_tail = p->proc_ind;
    }
@@ -1079,10 +1089,6 @@ yield(void)
   {
     printf("runable");
     add_proc_to_list(mycpu()->runnable_list_tail, p);
-    if (mycpu()->runnable_list_head == -1)
-    {
-      mycpu()->runnable_list_head = p->proc_ind;
-    }
     mycpu()->runnable_list_tail = p->proc_ind;
   }
   sched();
@@ -1128,11 +1134,6 @@ sleep(void *chan, struct spinlock *lk)
   acquire(&p->lock);  //DOC: sleeplock1
   release(lk);
 
-  // Go to sleep.
-  p->chan = chan;
-  p->state = SLEEPING;
-  p->start_sleeping_time = ticks;
-
   //Ass2
   printf("runable");
   int res = remove_proc_from_list(p->proc_ind); 
@@ -1152,6 +1153,11 @@ sleep(void *chan, struct spinlock *lk)
   p->next_proc = -1;
   p->prev_proc = -1;
 
+  // Go to sleep.
+  p->chan = chan;
+  p->state = SLEEPING;
+  p->start_sleeping_time = ticks;
+
   if (sleeping_list_tail != -1){
     printf("sleeping");
     add_proc_to_list(sleeping_list_tail, p);
@@ -1162,7 +1168,9 @@ sleep(void *chan, struct spinlock *lk)
     sleeping_list_tail = p->proc_ind;
   }
   else{
-    sleeping_list_tail = sleeping_list_head = p->proc_ind;
+    printf("head in sleeping\n");
+    sleeping_list_tail =  p->proc_ind;
+    sleeping_list_head = p->proc_ind;
   }
 
   sched();
@@ -1186,36 +1194,44 @@ wakeup(void *chan)
   // printf("wakeup\n");
   struct proc *p = &proc[sleeping_list_head];
 
-  printf("sleeping");
-  int res = remove_proc_from_list(p->proc_ind); 
-    if (res == 1){
-      sleeping_list_head = -1;
-      sleeping_list_tail = -1;
-    }
-    if (res == 2)
-    {
-      sleeping_list_head = p->next_proc;
-      proc[p->next_proc].prev_proc = -1;
-    }
-    if (res == 3){
-      sleeping_list_tail = p->prev_proc;
-      proc[p->prev_proc].next_proc = -1;
-    }
+  if (sleeping_list_head != -1)
+  {
+    printf("sleeping");
+    int res = remove_proc_from_list(p->proc_ind); 
+      if (res == 1){
+        sleeping_list_head = -1;
+        sleeping_list_tail = -1;
+      }
+      if (res == 2)
+      {
+        sleeping_list_head = p->next_proc;
+        proc[p->next_proc].prev_proc = -1;
+      }
+      if (res == 3){
+        sleeping_list_tail = p->prev_proc;
+        proc[p->prev_proc].next_proc = -1;
+      }
 
-    acquire(&p->lock);
-    p->state = RUNNABLE;
-    p->prev_proc = -1;
-    p->next_proc = -1;
-    release(&p->lock);
+      acquire(&p->lock);
+      p->state = RUNNABLE;
+      p->prev_proc = -1;
+      p->next_proc = -1;
+      release(&p->lock);
 
-    printf("runnable");
-
-    add_proc_to_list(cpus[p->cpu_num].runnable_list_tail, p);
-    if (cpus[p->cpu_num].runnable_list_head == -1)
-    {
-      cpus[p->cpu_num].runnable_list_head = p->proc_ind;
-    }
-    cpus[p->cpu_num].runnable_list_tail = p->proc_ind;
+      printf("runnable");
+     
+      if (cpus[p->cpu_num].runnable_list_head == -1)
+      {
+        printf("init runnable %d\n", p->proc_ind);
+        cpus[p->cpu_num].runnable_list_head = p->proc_ind;
+        cpus[p->cpu_num].runnable_list_tail = p->proc_ind;
+      }
+      else
+      {
+        add_proc_to_list(cpus[p->cpu_num].runnable_list_tail, p);
+        cpus[p->cpu_num].runnable_list_tail = p->proc_ind;
+      }
+      
 
     // printf("tail: %d\n", cpus[p->cpu_num].runnable_list_tail);
     // printf("end wakeup\n");
@@ -1233,6 +1249,7 @@ wakeup(void *chan)
   //     release(&p->lock);
   //   }
   // }
+  }
 }
 
 // Kill the process with the given pid.
@@ -1288,12 +1305,19 @@ set_cpu(int cpu_num)
     if (c->cpu_id == cpu_num)
     {
       printf("runnable");
-      add_proc_to_list(c->runnable_list_tail, myproc());
+      
       if (c->runnable_list_head == -1)
       {
+        printf("init runnable %d\n", proc->proc_ind);
+        c->runnable_list_tail = myproc()->proc_ind;
         c->runnable_list_head = myproc()->proc_ind;
       }
-      c->runnable_list_tail = myproc()->proc_ind;
+      else
+      {
+        add_proc_to_list(c->runnable_list_tail, myproc());
+        c->runnable_list_tail = myproc()->proc_ind;
+      }
+      
       return 0;
     }
   }

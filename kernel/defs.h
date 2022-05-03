@@ -112,6 +112,8 @@ int             print_stats(void);
 // Ass2
 int             set_cpu(int cpu_num);
 int             get_cpu(void);
+int             add_proc_to_list(int tail, struct proc *p);
+int             remove_proc_from_list(int ind);
 
 
 // swtch.S
