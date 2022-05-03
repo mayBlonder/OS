@@ -27,8 +27,9 @@ struct cpu {
   int intena;                 // Were interrupts enabled before push_off()?
 
   // Ass2
-  // TODO: Add here RUNNABLE list?
-  //  int cpu_num; ?
+  int runnable_list_head;     // The head of all ready processes.
+  int runnable_list_tail;     // The tail of all ready processes.
+  int cpu_id;
 };
 
 extern struct cpu cpus[NCPU];
@@ -104,7 +105,7 @@ struct proc {
   uint last_runnable_time;
   int paused;
 
-    // statistics
+  // statistics
   uint running_time;
   uint runnable_time;
   uint sleeping_time; 
@@ -112,7 +113,10 @@ struct proc {
   uint start_sleeping_time; 
 
   // Ass2
-  int cpu_num;
+  int cpu_num;                  // CPU's id which the process last ran on.
+  int proc_ind;                 // Process index in proc[].
+  int next_proc;                // The next process in the "linked list".
+  int prev_proc;                // The previous process in the "linked list".
 
   // wait_lock must be held when using this:
   struct proc *parent;         // Parent process
