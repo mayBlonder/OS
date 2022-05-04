@@ -131,18 +131,20 @@ proc_mapstacks(pagetable_t kpgtbl) {
         p->proc_ind = i;                               // Set index to process.
         p->prev_proc = -1;
         p->next_proc = -1;
-        if (i != 0)
+        if (i == 0)
+        {
+          unused_list_head = p->proc_ind;
+          unused_list_tail = p->proc_ind;
+        }
+        else
         {
           printf("unused");
           add_proc_to_list(unused_list_tail, p);
-          if (unused_list_head == -1)
-          {
-            unused_list_head = p->proc_ind;
-          }
-            unused_list_tail = p->proc_ind;             // After adding to list, updating tail.
+          unused_list_tail = p->proc_ind;             // After adding to list, updating tail.
         }
         i ++;
       }
+  
   struct cpu *c;
   for(c = cpus; c < &cpus[NCPU]; c++)
   {
@@ -150,53 +152,7 @@ proc_mapstacks(pagetable_t kpgtbl) {
     c->runnable_list_tail = -1;
   }
 }
-// void
-// procinit(void)
-// {
-//   // Added
-//   program_time = 0;
-//   cpu_utilization = 0;
-//   start_time = ticks;
-//   // int i = 0;
 
-//   // TODO: add all to UNUSED.
-
-//   struct proc *p;
-  
-//   initlock(&pid_lock, "nextpid");
-//   initlock(&wait_lock, "wait_lock");
-
-//   unused_list_head = proc->proc_ind;
-//   proc->prev_proc = -1;
-//   unused_list_tail = proc->proc_ind;
-//   for(p = proc; p < &proc[NPROC]; p++) {
-//       initlock(&p->lock, "proc");
-//       p->kstack = KSTACK((int) (p - proc));
-
-//       //Ass2
-//       p->proc_ind = i;                               // Set index to process.
-//       p->prev_proc = -1;
-//       p->next_proc = -1;
-//       if (i != 0)
-//       {
-//         printf("unused");
-//         add_proc_to_list(unused_list_tail, p);
-//          if (unused_list_head == -1)
-//         {
-//           unused_list_head = p->proc_ind;
-//         }
-//           unused_list_tail = p->proc_ind;             // After adding to list, updating tail.
-//       }
-//       i ++;
-//   }
-//   struct cpu *c;
-//   for(c = cpus; c < &cpus[NCPU]; c++)
-//   {
-//     c->runnable_list_head = -1;
-//     c->runnable_list_tail = -1;
-//   }
-
-// }
 
 // Must be called with interrupts disabled,
 // to prevent race with process being moved
@@ -270,7 +226,7 @@ allocproc(void)
 
   // Ass2
   // printf("unused_list_head: %d\n", unused_list_head);
-  if (unused_list_head > -1)
+  while (unused_list_head > -1)
   {
     p = &proc[unused_list_head];
     acquire(&p->lock);
@@ -1024,19 +980,19 @@ scheduler(void)
       swtch(&c->context, &p->context);
 
       
-      if (c->runnable_list_head == -1)
-      {
-        printf("init runnable %d  , prev: %d, next: %d                           7\n", p->proc_ind, p->prev_proc, p->next_proc);
-        c->runnable_list_head = p->proc_ind;
-        c->runnable_list_tail = p->proc_ind;
-      }
-      else
-      {
-        printf("runnable7");
-        add_proc_to_list(c->runnable_list_tail, p);
-        c->runnable_list_tail = p->proc_ind;
-        printf("added back: %d, prev: %d, next: %d\n", c->runnable_list_tail, proc[c->runnable_list_tail].prev_proc, proc[c->runnable_list_tail].next_proc);
-      }
+      // if (c->runnable_list_head == -1)
+      // {
+      //   printf("init runnable %d  , prev: %d, next: %d                           7\n", p->proc_ind, p->prev_proc, p->next_proc);
+      //   c->runnable_list_head = p->proc_ind;
+      //   c->runnable_list_tail = p->proc_ind;
+      // }
+      // else
+      // {
+      //   printf("runnable7");
+      //   add_proc_to_list(c->runnable_list_tail, p);
+      //   c->runnable_list_tail = p->proc_ind;
+      //   printf("added back: %d, prev: %d, next: %d\n", c->runnable_list_tail, proc[c->runnable_list_tail].prev_proc, proc[c->runnable_list_tail].next_proc);
+      // }
      
       // Process is done running for now.
       // It should have changed its p->state before coming back.
@@ -1250,7 +1206,8 @@ sleep(void *chan, struct spinlock *lk)
       }
     sleeping_list_tail = p->proc_ind;
   }
-  else{
+  else
+  {
     printf("head in sleeping\n");
     sleeping_list_tail =  p->proc_ind;
     sleeping_list_head = p->proc_ind;
