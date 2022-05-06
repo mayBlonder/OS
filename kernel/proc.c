@@ -225,9 +225,9 @@ allocproc(void)
   struct proc *p;
 
   // Ass2
-  // printf("unused_list_head: %d\n", unused_list_head);
   while (unused_list_head > -1)
   {
+    printf("allocproc!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
     p = &proc[unused_list_head];
     acquire(&p->lock);
     printf("unused");
@@ -289,14 +289,10 @@ found:
   p->runnable_time = 0;
 
 
-  // int i=0;
-
-
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
     freeproc(p);
     release(&p->lock);
-    // i++;
     return 0;
   }
 
@@ -305,7 +301,6 @@ found:
   if(p->pagetable == 0){
     freeproc(p);
     release(&p->lock);
-    // i++;
     return 0;
   }
 
@@ -315,8 +310,6 @@ found:
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
 
-  // if (i == 0)
-  //   release(&p->lock);
   return p;
 }
 
@@ -978,21 +971,6 @@ scheduler(void)
       p->cpu_num = c->cpu_id;
       c->proc = p;
       swtch(&c->context, &p->context);
-
-      
-      // if (c->runnable_list_head == -1)
-      // {
-      //   printf("init runnable %d  , prev: %d, next: %d                           7\n", p->proc_ind, p->prev_proc, p->next_proc);
-      //   c->runnable_list_head = p->proc_ind;
-      //   c->runnable_list_tail = p->proc_ind;
-      // }
-      // else
-      // {
-      //   printf("runnable7");
-      //   add_proc_to_list(c->runnable_list_tail, p);
-      //   c->runnable_list_tail = p->proc_ind;
-      //   printf("added back: %d, prev: %d, next: %d\n", c->runnable_list_tail, proc[c->runnable_list_tail].prev_proc, proc[c->runnable_list_tail].next_proc);
-      // }
      
       // Process is done running for now.
       // It should have changed its p->state before coming back.
@@ -1109,12 +1087,12 @@ yield(void)
   p->last_runnable_time = ticks;
 
   //Ass2
-   if (mycpu()->runnable_list_head == -1)
-   {
-     printf("init runnable : %d                   8\n", p->proc_ind);
+  if (mycpu()->runnable_list_head == -1)
+  {
+    printf("init runnable : %d                   8\n", p->proc_ind);
     mycpu()->runnable_list_head = p->proc_ind;
     mycpu()->runnable_list_tail = p->proc_ind;
-   }
+  }
   else
   {
     printf("runnable8");
@@ -1230,13 +1208,15 @@ wakeup(void *chan)
 {
   // TODO: go threw all SLEEPING and pick one to wake up- remove from SLEEPING and add to RUNNABLE.
   struct proc *p;
+
+  printf("wakeup\n");
   
   while (sleeping_list_head != -1)
   {
     p = &proc[sleeping_list_head];
     if (p->chan == chan)
     {
-      printf("wakeup\n"); 
+       
       printf("sleeping");
       int res = remove_proc_from_list(p->proc_ind); 
         if (res == 1)
