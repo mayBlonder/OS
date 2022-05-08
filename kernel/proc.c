@@ -56,18 +56,15 @@ extern uint64 cas( volatile void *addr, int expected, int newval);
 int
 add_proc_to_list(int tail, struct proc *p)
 {
-  // if (tail == p->pid)
-    // return 0;
-  printf("&&&&&&&&&&&&&&&adding: %d,     prev:   %d,   next:  %d\n", p->proc_ind, p->prev_proc, p->next_proc);
-  int p_before = proc[tail].next_proc;
-  if (cas(&proc[tail].next_proc, p_before, p->proc_ind) == 0)
-  {
-    p->prev_proc = tail;
-    p->next_proc = -1;
-    printf("&&&&&&&&&&&&&&&adding: %d,     prev:   %d,   next:  %d\n", p->proc_ind, p->prev_proc, p->next_proc);
-    return 0;
-  }
-  return -1;
+  acquire(&p->list_lock);
+  acquire(&proc[tail].list_lock);
+  proc[tail].next_proc = p->proc_ind;
+  p->prev_proc = tail;
+  p->next_proc = -1;
+  release(&proc[tail].list_lock);
+  release(&p->list_lock);
+
+  return 0;
 }
 
 // Ass2
@@ -76,7 +73,7 @@ remove_proc_from_list(int ind)
 {
   struct proc *p = &proc[ind];
 
-  printf("######### remove cur: %d,    prev: %d, next: %d   \n", ind, p->prev_proc, p->next_proc);
+  // printf("######### remove cur: %d,    prev: %d, next: %d   \n", ind, p->prev_proc, p->next_proc);
 
   if (p->prev_proc == -1 && p->next_proc == -1)
     return 1;  // Need to change head & tail.
@@ -87,15 +84,19 @@ remove_proc_from_list(int ind)
   if (p->next_proc == -1)
     return 3;  // Need to change tail.
 
-  int prev = proc[p->prev_proc].next_proc;
-  if (cas(&proc[p->prev_proc].next_proc, prev, p->next_proc) == 0)
-  {
-    proc[p->next_proc].prev_proc = p->prev_proc;
 
-    printf("######### remove cur: %d,    prev: %d, next: %d   \n", ind, p->prev_proc, p->next_proc);
-    return 0;
-  }
-  return -1;
+
+  struct proc *prev= &proc[p->prev_proc];
+  struct proc *next = &proc[p->next_proc];
+  acquire(&prev->list_lock);
+  acquire(&next->list_lock);
+  // int prev = proc[p->prev_proc].next_proc;
+  proc[p->prev_proc].next_proc = p->next_proc;
+  proc[p->next_proc].prev_proc = p->prev_proc;
+  release(&prev->list_lock);
+  release(&next->list_lock);
+
+  return 0;
 }
 
 // Allocate a page for each process's kernel stack.
@@ -138,7 +139,7 @@ proc_mapstacks(pagetable_t kpgtbl) {
         }
         else
         {
-          printf("unused");
+          // printf("unused");
           add_proc_to_list(unused_list_tail, p);
           unused_list_tail = p->proc_ind;             // After adding to list, updating tail.
         }
@@ -227,33 +228,39 @@ allocproc(void)
   // Ass2
   while (unused_list_head > -1)
   {
-    printf("allocproc!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+    // printf("allocproc!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
     p = &proc[unused_list_head];
     acquire(&p->lock);
-    printf("unused");
+    // printf("unused");
     int res = remove_proc_from_list(unused_list_head); 
 
     if (res == 1)
     {
       unused_list_head = -1;
       unused_list_tail = -1;
-      printf("1 no head & tail");
+      // printf("1 no head & tail");
     }
     if (res == 2)
     {
       unused_list_head = p->next_proc;      // Update head.
       if (proc[p->next_proc].next_proc == -1)
         unused_list_tail = p->next_proc;
+
+      acquire(&proc[p->next_proc].list_lock);
       proc[p->next_proc].prev_proc = -1;    // Remove head's prev.
-      printf("1 no head");
+      release(&proc[p->next_proc].list_lock);
+      // printf("1 no head");
     }
     if (res == 3)
     {
       unused_list_tail = p->prev_proc;      // Update tail.
        if (proc[p->prev_proc].prev_proc == -1)
         unused_list_head = p->prev_proc;
+      
+      acquire(&proc[p->prev_proc].list_lock);
       proc[p->prev_proc].next_proc = -1;    // Remove tail's next.
-      printf("1 no tail");
+      release(&proc[p->prev_proc].list_lock);
+      // printf("1 no tail");
     }
 
     p->prev_proc = -1;
@@ -336,35 +343,41 @@ freeproc(struct proc *p)
   p->state = UNUSED;
 
   // Ass2
-  printf("zombie");
+  // printf("zombie");
   int res = remove_proc_from_list(p->proc_ind); 
   if (res == 1)
   {
     zombie_list_head = -1;
     zombie_list_tail = -1;
-    printf("2 no head & tail");
+    // printf("2 no head & tail");
   }
   if (res == 2)
   {
     zombie_list_head = p->next_proc;
     if (proc[p->next_proc].next_proc == -1)
       zombie_list_tail = p->next_proc;
+    
+    acquire(&proc[p->next_proc].list_lock);
     proc[p->next_proc].prev_proc = -1;
-    printf("1 no head ");
+    release(&proc[p->next_proc].list_lock);
+    // printf("1 no head ");
   }
   if (res == 3){
     zombie_list_tail = p->prev_proc;
      if (proc[p->prev_proc].prev_proc == -1)
       zombie_list_head = p->prev_proc;
+    
+    acquire(&proc[p->prev_proc].list_lock);
     proc[p->prev_proc].next_proc = -1;
-    printf("1 no tail");
+    release(&proc[p->prev_proc].list_lock);
+    // printf("1 no tail");
   }
 
   p->next_proc = -1;
   p->prev_proc = -1;
 
   if (unused_list_tail != -1){
-    printf("unused");
+    // printf("unused");
     add_proc_to_list(unused_list_tail, p);
     if (unused_list_head == -1)
   {
@@ -479,13 +492,13 @@ userinit(void)
   //Ass2
   if (mycpu()->runnable_list_head == -1)
   {
-    printf("init runnable: %d            1\n", p->proc_ind);
+    // printf("init runnable: %d            1\n", p->proc_ind);
     mycpu()->runnable_list_head = p->proc_ind;
     mycpu()->runnable_list_tail = p->proc_ind;
   }
   else
   {
-    printf("runnable1");
+    // printf("runnable1");
     add_proc_to_list(mycpu()->runnable_list_tail, p);
     mycpu()->runnable_list_tail = p->proc_ind;
   }
@@ -524,6 +537,8 @@ fork(void)
   struct proc *np;
   struct proc *p = myproc();
 
+  printf("FORKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK\n");
+
   // Allocate process.
   if((np = allocproc()) == 0){
     return -1;
@@ -553,6 +568,8 @@ fork(void)
 
   pid = np->pid;
 
+  printf("pid: %d\n", pid);
+
   release(&np->lock);
 
   acquire(&wait_lock);
@@ -565,15 +582,16 @@ fork(void)
   np->last_runnable_time = ticks;
 
   // Ass2
+  
   if (mycpu()->runnable_list_head == -1)
   {
-    printf("init runnable %d                 2\n", p->proc_ind);
+    printf("init runnable %d                 2\n", np->proc_ind);
     mycpu()->runnable_list_head = np->proc_ind;
     mycpu()->runnable_list_tail = np->proc_ind;
   }
   else
   {
-    printf("runnable2");
+    printf("runnable2             %d\n", mycpu()->runnable_list_tail);
     add_proc_to_list(mycpu()->runnable_list_tail, np);
     mycpu()->runnable_list_tail = np->proc_ind;
   }
@@ -655,35 +673,41 @@ exit(int status)
   p->running_time += ticks - p->start_running_time;
 
   //Ass2 
-  printf("runnable ");
+  // printf("runnable ");
   int res = remove_proc_from_list(p->proc_ind); 
   if (res == 1)
   {
     mycpu()->runnable_list_head = -1;
     mycpu()->runnable_list_tail = -1;
-    printf("3 no head & tail");
+    // printf("3 no head & tail");
   }
   if (res == 2)
   {
     mycpu()->runnable_list_head = p->next_proc;
     if (proc[p->next_proc].next_proc == -1)
       mycpu()->runnable_list_tail = p->next_proc;
+    
+    acquire(&proc[p->next_proc].list_lock);
     proc[p->next_proc].prev_proc = -1;
-    printf("3 no head");
+    release(&proc[p->next_proc].list_lock);
+    // printf("3 no head");
   }
   if (res == 3){
     mycpu()->runnable_list_tail = p->prev_proc;
     if (proc[p->prev_proc].prev_proc == -1)
       mycpu()->runnable_list_head = p->prev_proc;
+    
+    acquire(&proc[p->prev_proc].list_lock);
     proc[p->prev_proc].next_proc = -1;
-    printf("3 no tail");
+    release(&proc[p->prev_proc].list_lock);
+    // printf("3 no tail");
   }
 
   p->next_proc = -1;
   p->prev_proc = -1;
 
   if (zombie_list_tail != -1){
-    printf("zombie");
+    // printf("zombie");
     add_proc_to_list(zombie_list_tail, p);
      if (zombie_list_head == -1)
       {
@@ -710,20 +734,27 @@ wait(uint64 addr)
   int havekids, pid;
   struct proc *p = myproc();
 
+
+  // printf("in start wait\n");
   acquire(&wait_lock);
 
   for(;;){
     // Scan through table looking for exited children.
+
+    printf("\nin for\n");
     havekids = 0;
     for(np = proc; np < &proc[NPROC]; np++){
+      // printf("for\n");
       if(np->parent == p){
+        printf("np->parent == p         %d,      %d\n", p->pid, np->state);
         // make sure the child isn't still in exit() or swtch().
         acquire(&np->lock);
-
+        printf("after lock aquired\n");
         havekids = 1;
         if(np->state == ZOMBIE){
           // Found one.
           pid = np->pid;
+          printf("found: %d\n", pid);
           if(addr != 0 && copyout(p->pagetable, addr, (char *)&np->xstate,
                                   sizeof(np->xstate)) < 0) {
             release(&np->lock);
@@ -737,6 +768,7 @@ wait(uint64 addr)
         }
         release(&np->lock);
       }
+      // printf("end of for\n");
     }
 
     // No point waiting if we don't have any children.
@@ -745,19 +777,7 @@ wait(uint64 addr)
       return -1;
     }
 
-    // added
-    if (p->state == RUNNING)
-    {
-      p->running_time += ticks - p->start_running_time;
-    }
-     if (p->state == RUNNABLE)
-    {
-      p->runnable_time += ticks - p->last_runnable_time;
-    }
-    if (p->state == SLEEPING)
-    {
-      p->sleeping_time += ticks - p->start_sleeping_time;
-    }
+    printf("havekids || !p->killed\n");
     
     // Wait for a child to exit.
     sleep(p, &wait_lock);  //DOC: wait-sleep
@@ -933,35 +953,41 @@ scheduler(void)
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
 
-    printf("start sched\n");
+    // printf("start sched\n");
     if (c->runnable_list_head != -1)
     {
       p = &proc[c->runnable_list_head];
-      printf("proc ind: %d\n", c->runnable_list_head);
+      // printf("proc ind: %d\n", c->runnable_list_head);
 
       //Ass2
-      printf("runnable3");
+      // printf("runnable3");
       int res = remove_proc_from_list(p->proc_ind); 
       if (res == 1)
       {
         c->runnable_list_head = -1;
         c->runnable_list_tail = -1;
-        printf("No head & tail");
+        // printf("No head & tail");
       }
       if (res == 2)
       {
         c->runnable_list_head = p->next_proc;
         if (proc[p->next_proc].next_proc == -1)
           c->runnable_list_tail = p->next_proc;
+        
+        acquire(&proc[p->next_proc].list_lock);
         proc[p->next_proc].prev_proc = -1;
-        printf("New head: %d\n", c->runnable_list_head);
+        release(&proc[p->next_proc].list_lock);
+        // printf("New head: %d\n", c->runnable_list_head);
       }
       if (res == 3){
         c->runnable_list_tail = p->prev_proc;
         if (proc[p->prev_proc].prev_proc == -1)
           c->runnable_list_head = p->prev_proc;
+        
+        acquire(&proc[p->prev_proc].list_lock);
         proc[p->prev_proc].next_proc = -1;
-        printf("No tail");
+        release(&proc[p->prev_proc].list_lock);
+        // printf("No tail");
       }
 
       acquire(&p->lock);
@@ -977,76 +1003,28 @@ scheduler(void)
       c->proc = 0;
       release(&p->lock);
 
-      printf("end sched\n");
+      // printf("end sched\n");
     }
   }
 }
 
-// void
-// scheduler(void)
-// // default_scheduler(void)
-// {
-//   // TODO: pick first process from list.
-//   struct proc *p;
-//   struct cpu *c = mycpu();
-  
-//   c->proc = 0;
-//   for(;;){
-//     // Avoid deadlock by ensuring that devices can interrupt.
-//     intr_on();
+void
+translate_state(int s)
+{
+  if (s == 0)
+    printf("UNUSED");
+  if (s == 1)
+    printf("USED");
+  if (s == 2)
+    printf("SLEEPING");
+  if (s == 3)
+    printf("RUNNABLE");
+  if (s == 4)
+    printf("RUNNING");
+  if (s == 5)
+    printf("ZOMBIE");
+}
 
-//     for(p = proc; p < &proc[NPROC]; p++) {
-//       acquire(&p->lock);
-//       if(p->state == RUNNABLE && p->paused == 0) {
-
-//         // Switch to chosen process.  It is the process's job
-//         // to release its lock and then reacquire it
-//         // before jumping back to us.
-
-//         p->runnable_time += ticks - p->last_runnable_time;
-
-//         p->state = RUNNING;
-
-//         p->start_running_time = ticks;
-
-//         c->proc = p;
-//         swtch(&c->context, &p->context);
-
-//         // Process is done running for now.
-//         // It should have changed its p->state before coming back.
-//         c->proc = 0;
-//       }
-//       release(&p->lock);
-//     }
-//     if (pause_flag == 1) 
-//     {
-//       if (wake_up_time <= ticks) 
-//       {
-//         pause_flag = 0;
-//         unpause_system();
-//       }
-//     }
-//   }
-// }
-
-//added
-// void 
-// scheduler(void)
-// {
-//   #ifdef FCFS
-//     FCFS_scheduler();
-//   #endif
-
-//   #ifdef SJF
-//     SJF_scheduler();
-//   #endif
-  
-//   #ifdef RR
-//     default_scheduler();
-//   #endif
-  
-  
-// }
 
 // Switch to scheduler.  Must hold only p->lock
 // and have changed proc->state. Saves and restores
@@ -1070,9 +1048,15 @@ sched(void)
   if(intr_get())
     panic("sched interruptible");
 
+
+  printf("sched1\n");
   intena = mycpu()->intena;
+  printf("swtch to : %d      state:\n", p->pid);
+  translate_state(p->state);
   swtch(&p->context, &mycpu()->context);
+  printf("after swatch\n");
   mycpu()->intena = intena;
+  printf("sched3\n");
 }
 
 // Give up the CPU for one scheduling round.
@@ -1089,13 +1073,13 @@ yield(void)
   //Ass2
   if (mycpu()->runnable_list_head == -1)
   {
-    printf("init runnable : %d                   8\n", p->proc_ind);
+    // printf("init runnable : %d                   8\n", p->proc_ind);
     mycpu()->runnable_list_head = p->proc_ind;
     mycpu()->runnable_list_tail = p->proc_ind;
   }
   else
   {
-    printf("runnable8");
+    // printf("runnable8");
     add_proc_to_list(mycpu()->runnable_list_tail, p);
     mycpu()->runnable_list_tail = p->proc_ind;
   }
@@ -1149,22 +1133,28 @@ sleep(void *chan, struct spinlock *lk)
   {
     mycpu()->runnable_list_head = -1;
     mycpu()->runnable_list_tail = -1;
-    printf("4 no head & tail");
+    // printf("4 no head & tail");
   }
   if (res == 2)
   {
     mycpu()->runnable_list_head = p->next_proc;
     if (proc[p->next_proc].next_proc == -1)
       mycpu()->runnable_list_tail = p->next_proc;
+    
+    acquire(&proc[p->next_proc].list_lock);
     proc[p->next_proc].prev_proc = -1;
-    printf("4 no head ");
+    release(&proc[p->next_proc].list_lock);
+    // printf("4 no head ");
   }
   if (res == 3){
     mycpu()->runnable_list_tail = p->prev_proc;
     if (proc[p->prev_proc].prev_proc == -1)
       mycpu()->runnable_list_head = p->prev_proc;
+    
+    acquire(&proc[p->prev_proc].list_lock);
     proc[p->prev_proc].next_proc = -1;
-    printf("4 no tail");
+    release(&proc[p->prev_proc].list_lock);
+    // printf("4 no tail");
   }
 
   p->next_proc = -1;
@@ -1176,7 +1166,7 @@ sleep(void *chan, struct spinlock *lk)
   p->start_sleeping_time = ticks;
 
   if (sleeping_list_tail != -1){
-    printf("sleeping");
+    // printf("sleeping");
     add_proc_to_list(sleeping_list_tail, p);
     if (sleeping_list_head == -1)
       {
@@ -1186,12 +1176,16 @@ sleep(void *chan, struct spinlock *lk)
   }
   else
   {
-    printf("head in sleeping\n");
+    // printf("head in sleeping\n");
     sleeping_list_tail =  p->proc_ind;
     sleeping_list_head = p->proc_ind;
   }
 
+  printf("before sched\n");
+
   sched();
+
+  printf("after sched\n");
 
   // Tidy up.
   p->chan = 0;
@@ -1213,40 +1207,47 @@ wakeup(void *chan)
   
   while (sleeping_list_head != -1)
   {
+    printf("head != -1\n");
     p = &proc[sleeping_list_head];
-    if (p->chan == chan)
+    if(p != myproc())
     {
-       
-      printf("sleeping");
-      int res = remove_proc_from_list(p->proc_ind); 
-        if (res == 1)
-        {
-          sleeping_list_head = -1;
-          sleeping_list_tail = -1;
-          printf("5 no head & tail");
-        }
-        if (res == 2)
-        {
-          sleeping_list_head = p->next_proc;
-          if (proc[p->next_proc].next_proc == -1)
-            sleeping_list_tail = p->next_proc;
-          proc[p->next_proc].prev_proc = -1;
-          printf("5 no head ");
-        }
-        if (res == 3){
-          sleeping_list_tail = p->prev_proc;
-          if (proc[p->prev_proc].prev_proc == -1)
-            sleeping_list_head = p->prev_proc;
-          proc[p->prev_proc].next_proc = -1;
-          printf("5 no tail");
-        }
+      printf("p != myproc()\n");
+      acquire(&p->lock);
+      printf("p->chan == chan          %d\n", (p->chan == chan));
+      if (p->state == SLEEPING && p->chan == chan)
+      {   
+        printf("sleeping");
+        int res = remove_proc_from_list(p->proc_ind); 
+          if (res == 1) // []
+          {
+            sleeping_list_head = -1;
+            sleeping_list_tail = -1;
+            printf("5 no head & tail");
+          }
+          if (res == 2) // If removing last entry in array.
+          {
+            sleeping_list_head = p->next_proc;
+            if (proc[p->next_proc].next_proc == -1)
+              sleeping_list_tail = p->next_proc;
 
-        acquire(&p->lock);
+            acquire(&proc[p->next_proc].list_lock);
+            proc[p->next_proc].prev_proc = -1;
+            release(&proc[p->next_proc].list_lock);
+            printf("5 no head ");
+          }
+          if (res == 3){
+            sleeping_list_tail = p->prev_proc;
+            if (proc[p->prev_proc].prev_proc == -1)
+              sleeping_list_head = p->prev_proc;
+
+            acquire(&proc[p->prev_proc].list_lock);
+            proc[p->prev_proc].next_proc = -1;
+            release(&proc[p->prev_proc].list_lock);
+            printf("5 no tail");
+          }
         p->state = RUNNABLE;
         p->prev_proc = -1;
         p->next_proc = -1;
-        release(&p->lock);
-
         
         if (cpus[p->cpu_num].runnable_list_head == -1)
         {
@@ -1260,24 +1261,15 @@ wakeup(void *chan)
           add_proc_to_list(cpus[p->cpu_num].runnable_list_tail, p);
           cpus[p->cpu_num].runnable_list_tail = p->proc_ind;
         }
+        printf("tail: %d\n", cpus[p->cpu_num].runnable_list_tail);
+        printf("end wakeup\n");
+      }
+      release(&p->lock);
     }
-
-    // printf("tail: %d\n", cpus[p->cpu_num].runnable_list_tail);
-    // printf("end wakeup\n");
-
-
-  // for(p = proc; p < &proc[NPROC]; p++) {
-  //   if(p != myproc()){
-  //     acquire(&p->lock);
-  //     if(p->state == SLEEPING && p->chan == chan) {
-  //       p->state = RUNNABLE;
-  //       p->sleeping_time += ticks - p->start_sleeping_time;
-  //       // added
-  //       p->last_runnable_time = ticks;
-  //     }
-  //     release(&p->lock);
-  //   }
-  // }
+    if (p->next_proc != -1)
+      p = &proc[p->next_proc];
+    else
+      return;
   }
 }
 
@@ -1337,13 +1329,13 @@ set_cpu(int cpu_num)
       
       if (c->runnable_list_head == -1)
       {
-        printf("init runnable %d                   5\n", proc->proc_ind);
+        // printf("init runnable %d                   5\n", proc->proc_ind);
         c->runnable_list_tail = myproc()->proc_ind;
         c->runnable_list_head = myproc()->proc_ind;
       }
       else
       {
-        printf("runnable5");
+        // printf("runnable5");
         add_proc_to_list(c->runnable_list_tail, myproc());
         c->runnable_list_tail = myproc()->proc_ind;
       }
