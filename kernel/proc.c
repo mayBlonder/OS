@@ -56,13 +56,6 @@ isEmpty(struct linked_list *lst){
   return h;
 }
 
-int 
-get_head(struct linked_list *lst){
-  acquire(&lst->head_lock); 
-  int output = lst->head;
-  release(&lst->head_lock);
-  return output;
-}
 
 void set_prev_proc(struct proc *p, int value){
   p->prev_proc = value; 
@@ -226,7 +219,6 @@ allocproc(void)
 
   while(!isEmpty(&unused_list)){
     p = &proc[unused_list.head];
-    // p = &proc[get_head(&unused_list)];
     acquire(&p->lock);
     if(p->state == UNUSED) {
       remove(&unused_list, p); 
@@ -585,7 +577,7 @@ scheduler(void)
     intr_on();
     
     while(!isEmpty(&(c->runnable_list))){ // check whether there is a ready process in the cpu
-      p =  &proc[get_head(&c->runnable_list)]; //  pick the first process from the correct CPU’s list.
+      p = &proc[c->runnable_list.head];
       if(p->state == RUNNABLE) {
         acquire(&p->lock);
         // if(p->state == RUNNABLE) {  
@@ -714,7 +706,8 @@ wakeup(void *chan)
 {
   struct proc *p;
   struct cpu *c;
-  int curr = get_head(&sleeping_list);
+
+  int curr = sleeping_list.head;
 
   while(curr != -1) {
     p = &proc[curr];
