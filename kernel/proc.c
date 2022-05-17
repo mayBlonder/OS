@@ -217,7 +217,7 @@ allocproc(void)
   // Removing the new process from the UNUSED entry list.
   struct proc *p;
 
-  while(!isEmpty(&unused_list)){
+    while(!(unused_list.head == -1)){
     p = &proc[unused_list.head];
     acquire(&p->lock);
     if(p->state == UNUSED) {
@@ -279,8 +279,8 @@ freeproc(struct proc *p)
   p->xstate = 0;
   p->state = UNUSED;
 
-  remove(&zombie_list, p); // remove the freed process from the ZOMBIE list
-  append(&unused_list, p); // admit its entry to the UNUSED entry list.
+  remove(&zombie_list, p); 
+  append(&unused_list, p); 
 }
 
 // Create a user page table for a given process,
@@ -360,7 +360,8 @@ userinit(void)
   p->cwd = namei("/");
 
   p->state = RUNNABLE;
-  append(&(cpus[0].runnable_list), p); // admit the init process (the first process in the OS) to the first CPU’s list.
+  struct linked_list *l = &cpus[0].runnable_list;
+  append(l, p);
 
   release(&p->lock);
 }
