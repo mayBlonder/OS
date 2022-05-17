@@ -105,18 +105,15 @@ append(struct linked_list *lst, struct proc *p){
     release(&lst->head_lock);
   }
   else{ 
-    struct proc *curr = &proc[lst->head];
-    acquire(&curr->list_lock);
+    acquire(&proc[lst->tail].list_lock);
     release(&lst->head_lock);
-    while(curr->next_proc != -1){ // search tail
-      acquire(&proc[curr->next_proc].list_lock);
-      release(&curr->list_lock);
-      curr = &proc[curr->next_proc];
-    }
-    set_next_proc(curr, p->proc_ind);  // update next proc of the curr tail
-    set_prev_proc(p, curr->proc_ind); // update the prev proc of the new proc
-    release(&curr->list_lock);
+    set_next_proc(&proc[lst->tail], p->proc_ind);  // update next proc of the curr tail
+    set_prev_proc(p, proc[lst->tail].proc_ind); // update the prev proc of the new proc
+    release(&proc[lst->tail].list_lock);
   }
+  acquire(&lst->head_lock);
+  lst->tail = p->proc_ind;
+  release(&lst->head_lock);
 }
 
 void 
@@ -124,33 +121,19 @@ remove(struct linked_list *lst, struct proc *p){
   acquire(&lst->head_lock);
   if(isEmpty(lst)){
     release(&lst->head_lock);
-    panic("Fails in removing the process from the list: the list is empty\n");
+    panic("list is empty\n");
   }
 
   if(lst->head == p->proc_ind){ // the required proc is the head
     lst->head = p->next_proc;
-    if(p->next_proc != -1) {
-      set_prev_proc(&proc[p->next_proc], -1);
-    }
+    set_prev_proc(&proc[p->next_proc], -1);
     release(&lst->head_lock);
   }
   else{
-    // struct proc *curr = &proc[lst->head];
-    // acquire(&curr->list_lock);
+    if (lst->tail == p->proc_ind) {
+      lst->tail = p->prev_proc;
+    }
     release(&lst->head_lock); 
-    // while(curr->next_proc != p->proc_ind && curr->next_proc != -1){ // search p
-    //   acquire(&proc[curr->next_proc].list_lock);
-    //   release(&curr->list_lock);
-    //   curr = &proc[curr->next_proc];
-    // }
-    // if(curr->next_proc == -1){
-    //   panic("Fails in removing the process from the list: process is not found in the list\n");
-    // }
-    // acquire(&p->list_lock);
-    // set_next_proc(curr, p->next_proc);
-    // set_prev_proc(&proc[p->next_proc], curr->proc_ind);
-    // release(&curr->list_lock);
-    // release(&p->list_lock);
     acquire(&p->list_lock);
     acquire(&proc[p->prev_proc].list_lock);
     set_next_proc(&proc[p->prev_proc], p->next_proc);
