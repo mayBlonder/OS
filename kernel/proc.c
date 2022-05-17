@@ -34,46 +34,31 @@ struct linked_list sleeping_list = {-1}; // contains all SLEEPING processes.
 struct linked_list zombie_list = {-1};   // contains all ZOMBIE processes.
 
 void 
-increment_cpu_process_count(struct cpu *c){
-  uint64 curr_count;
-  do{
-    curr_count = c->proc_cnt;
-  }while(cas(&(c->proc_cnt), curr_count, curr_count+1));
-}
-
-void
-print_list(struct linked_list lst){
-  int curr = lst.head;
-  printf("\n[ ");
-  while(curr != -1){
-    printf(" %d,", curr);
-    curr = proc[curr].next_proc;
+inc_cpu(struct cpu *c){
+  uint64 procs_num;
+  do
+  {
+    procs_num = c->proc_cnt;
   }
-  printf(" ]\n");
+  while (cas(&(c->proc_cnt), procs_num, procs_num+1));
 }
 
 
-void initialize_list(struct linked_list *lst){
-  acquire(&lst->head_lock);
-  lst->head = -1;
-  acquire(&lst->head_lock);
-}
-
-void initialize_lists(void){
-  struct cpu *c;
-  for(c = cpus; c < &cpus[NCPU] && c != NULL ; c++){
-    c->runnable_list = (struct linked_list){-1};
-    initlock(&c->runnable_list.head_lock, "cpu_runnable_list - head lock");
-  }
-  initlock(&unused_list.head_lock, "unused_list - head lock");
-  initlock(&sleeping_list.head_lock, "sleeping_list - head lock");
-  initlock(&zombie_list.head_lock, "zombie_list - head lock");
-}
+// void initialize_lists(void){
+//   struct cpu *c;
+//   for(c = cpus; c < &cpus[NCPU] && c != NULL ; c++){
+//     c->runnable_list = (struct linked_list){-1};
+//     initlock(&c->runnable_list.head_lock, "cpu_runnable_list - head lock");
+//   }
+//   initlock(&unused_list.head_lock, "unused_list - head lock");
+//   initlock(&sleeping_list.head_lock, "sleeping_list - head lock");
+//   initlock(&zombie_list.head_lock, "zombie_list - head lock");
+// }
 
 void
 initialize_proc(struct proc *p){
-  p->next_proc = -1;
   p->prev_proc = -1;
+  p->next_proc = -1;
 }
 
 int
@@ -172,7 +157,15 @@ procinit(void)
 {
   struct proc *p;
 
-  initialize_lists();
+  // initialize_lists();
+  struct cpu *c;
+  for(c = cpus; c < &cpus[NCPU] && c != NULL ; c++){
+    c->runnable_list = (struct linked_list){-1};
+    initlock(&c->runnable_list.head_lock, "cpu_runnable_list - head lock");
+  }
+  initlock(&unused_list.head_lock, "unused_list - head lock");
+  initlock(&sleeping_list.head_lock, "sleeping_list - head lock");
+  initlock(&zombie_list.head_lock, "zombie_list - head lock");
 
   initlock(&pid_lock, "nextpid");
   initlock(&wait_lock, "wait_lock");
@@ -458,7 +451,7 @@ fork(void)
   #endif
   
   struct cpu *c = &cpus[np->last_cpu];
-  increment_cpu_process_count(c);
+  inc_cpu(c);
 
   //printf("insert fork runnable %d\n", np->index); //delete
   append(&(c->runnable_list), np); // admit the new process to the father’s current CPU’s ready list
@@ -741,7 +734,7 @@ wakeup(void *chan)
           p->last_cpu = min_cpu_process_count(); // case BLNCFLG=ON -> cpu = CPU with the lowest counter value
         #endif
         c = &cpus[p->last_cpu];
-        increment_cpu_process_count(c);
+        inc_cpu(c);
 
         append(&(c->runnable_list), p);
       }
@@ -893,5 +886,5 @@ steal_process(struct cpu *curr_c){  /*
   p = proc[stolen_process];
   append(&c->runnable_list, p);
   p->last_cpu = c->cpu_id;
-  increment_cpu_process_count(c); */
+  inc_cpu(c); */
 }
