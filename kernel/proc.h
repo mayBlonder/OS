@@ -1,4 +1,12 @@
 
+
+struct linked_list {
+  int head;                  
+  int tail;
+  struct spinlock head_lock;
+};
+
+
 // Saved registers for kernel context switches.
 struct context {
   uint64 ra;
@@ -25,11 +33,9 @@ struct cpu {
   struct context context;     // swtch() here to enter scheduler().
   int noff;                   // Depth of push_off() nesting.
   int intena;                 // Were interrupts enabled before push_off()?
-
-  // Ass2
-  int runnable_list_head;     // The head of all ready processes.
-  int runnable_list_tail;     // The tail of all ready processes.
+  int proc_cnt;
   int cpu_id;
+  struct linked_list runnable_list;
 };
 
 extern struct cpu cpus[NCPU];
@@ -99,25 +105,6 @@ struct proc {
   int xstate;                  // Exit status to be returned to parent's wait
   int pid;                     // Process ID
 
-  // Ass1
-  uint mean_ticks;              // mean_ticks = ((10 - rate) * mean_ticks + last_ticks * (rate)) / 10
-  uint last_ticks;              // Number of ticks in the last CPU burst 
-  uint last_runnable_time;
-  int paused;
-
-  // statistics
-  uint running_time;
-  uint runnable_time;
-  uint sleeping_time; 
-  uint start_running_time;
-  uint start_sleeping_time; 
-
-  // Ass2
-  int cpu_num;                  // CPU's id which the process last ran on.
-  int proc_ind;                 // Process index in proc[].
-  int next_proc;                // The next process in the "linked list".
-  int prev_proc;                // The previous process in the "linked list".
-
   // wait_lock must be held when using this:
   struct proc *parent;         // Parent process
 
@@ -130,4 +117,10 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+
+  int last_cpu;
+  int next_proc;
+  int prev_proc;
+  int proc_ind;
+  struct spinlock list_lock;
 };

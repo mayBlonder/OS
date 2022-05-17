@@ -105,28 +105,3 @@ uptime:
  li a7, SYS_uptime
  ecall
  ret
-.global pause_system
-pause_system:
- li a7, SYS_pause_system
- ecall
- ret
-.global kill_system
-kill_system:
- li a7, SYS_kill_system
- ecall
- ret
-.global print_stats
-print_stats:
- li a7, SYS_print_stats
- ecall
- ret
-.global get_cpu
-get_cpu:
- li a7, SYS_get_cpu
- ecall
- ret
-.global set_cpu
-set_cpu:
- li a7, SYS_set_cpu
- ecall
- ret

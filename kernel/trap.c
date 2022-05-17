@@ -75,16 +75,10 @@ usertrap(void)
 
   if(p->killed)
     exit(-1);
-  
-  #ifdef DEFAULT
+
   // give up the CPU if this is a timer interrupt.
-  if(which_dev == 2){
-    if (myproc()->state == RUNNING){
-      myproc()->running_time += ticks - start_running_time;
-    }
+  if(which_dev == 2)
     yield();
-  }
-  #endif
 
   usertrapret();
 }
@@ -144,9 +138,8 @@ kerneltrap()
   uint64 sstatus = r_sstatus();
   uint64 scause = r_scause();
   
-  if((sstatus & SSTATUS_SPP) == 0){
+  if((sstatus & SSTATUS_SPP) == 0)
     panic("kerneltrap: not from supervisor mode");
-    }
   if(intr_get() != 0)
     panic("kerneltrap: interrupts enabled");
 
@@ -157,10 +150,8 @@ kerneltrap()
   }
 
   // give up the CPU if this is a timer interrupt.
-  if(which_dev == 2 && myproc() != 0 && myproc()->state == RUNNING){
-    myproc()->running_time += ticks - myproc()->start_running_time;
+  if(which_dev == 2 && myproc() != 0 && myproc()->state == RUNNING)
     yield();
-  }
 
   // the yield() may have caused some traps to occur,
   // so restore trap registers for use by kernelvec.S's sepc instruction.

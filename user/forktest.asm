@@ -47,7 +47,7 @@ forktest(void)
 
   print("fork test\n");
   3a:	00000517          	auipc	a0,0x0
-  3e:	42650513          	addi	a0,a0,1062 # 460 <set_cpu+0xc>
+  3e:	3fe50513          	addi	a0,a0,1022 # 438 <uptime+0xc>
   42:	00000097          	auipc	ra,0x0
   46:	fbe080e7          	jalr	-66(ra) # 0 <print>
 
@@ -71,7 +71,7 @@ forktest(void)
   if(n == N){
     print("fork claimed to work N times!\n");
   64:	00000517          	auipc	a0,0x0
-  68:	40c50513          	addi	a0,a0,1036 # 470 <set_cpu+0x1c>
+  68:	3e450513          	addi	a0,a0,996 # 448 <uptime+0x1c>
   6c:	00000097          	auipc	ra,0x0
   70:	f94080e7          	jalr	-108(ra) # 0 <print>
     exit(1);
@@ -113,7 +113,7 @@ forktest(void)
 
   print("fork test OK\n");
   b4:	00000517          	auipc	a0,0x0
-  b8:	40c50513          	addi	a0,a0,1036 # 4c0 <set_cpu+0x6c>
+  b8:	3e450513          	addi	a0,a0,996 # 498 <uptime+0x6c>
   bc:	00000097          	auipc	ra,0x0
   c0:	f44080e7          	jalr	-188(ra) # 0 <print>
 }
@@ -125,7 +125,7 @@ forktest(void)
   ce:	8082                	ret
       print("wait stopped early\n");
   d0:	00000517          	auipc	a0,0x0
-  d4:	3c050513          	addi	a0,a0,960 # 490 <set_cpu+0x3c>
+  d4:	39850513          	addi	a0,a0,920 # 468 <uptime+0x3c>
   d8:	00000097          	auipc	ra,0x0
   dc:	f28080e7          	jalr	-216(ra) # 0 <print>
       exit(1);
@@ -134,7 +134,7 @@ forktest(void)
   e6:	2b2080e7          	jalr	690(ra) # 394 <exit>
     print("wait got too many\n");
   ea:	00000517          	auipc	a0,0x0
-  ee:	3be50513          	addi	a0,a0,958 # 4a8 <set_cpu+0x54>
+  ee:	39650513          	addi	a0,a0,918 # 480 <uptime+0x54>
   f2:	00000097          	auipc	ra,0x0
   f6:	f0e080e7          	jalr	-242(ra) # 0 <print>
     exit(1);
@@ -795,53 +795,3 @@ uptime:
  42e:	00000073          	ecall
  ret
  432:	8082                	ret
-
-0000000000000434 <pause_system>:
-.global pause_system
-pause_system:
- li a7, SYS_pause_system
- 434:	48d9                	li	a7,22
- ecall
- 436:	00000073          	ecall
- ret
- 43a:	8082                	ret
-
-000000000000043c <kill_system>:
-.global kill_system
-kill_system:
- li a7, SYS_kill_system
- 43c:	48dd                	li	a7,23
- ecall
- 43e:	00000073          	ecall
- ret
- 442:	8082                	ret
-
-0000000000000444 <print_stats>:
-.global print_stats
-print_stats:
- li a7, SYS_print_stats
- 444:	48e1                	li	a7,24
- ecall
- 446:	00000073          	ecall
- ret
- 44a:	8082                	ret
-
-000000000000044c <get_cpu>:
-.global get_cpu
-get_cpu:
- li a7, SYS_get_cpu
- 44c:	48e5                	li	a7,25
- ecall
- 44e:	00000073          	ecall
- ret
- 452:	8082                	ret
-
-0000000000000454 <set_cpu>:
-.global set_cpu
-set_cpu:
- li a7, SYS_set_cpu
- 454:	48e9                	li	a7,26
- ecall
- 456:	00000073          	ecall
- ret
- 45a:	8082                	ret
