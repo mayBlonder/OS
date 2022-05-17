@@ -78,7 +78,9 @@ initialize_proc(struct proc *p){
 
 int
 isEmpty(struct linked_list *lst){
-  return lst->head == -1;
+  int h= 0;
+  h = lst->head == -1;
+  return h;
 }
 
 int 
@@ -127,6 +129,10 @@ remove(struct linked_list *lst, struct proc *p){
   if(lst->head == p->proc_ind){ // the required proc is the head
     lst->head = p->next_proc;
     set_prev_proc(&proc[p->next_proc], -1);
+
+    if(lst->tail == p->proc_ind){
+      lst->tail = -1;
+    }
     release(&lst->head_lock);
   }
   else{
