@@ -43,18 +43,6 @@ inc_cpu(struct cpu *c){
   while (cas(&(c->proc_cnt), procs_num, procs_num+1));
 }
 
-
-// void initialize_lists(void){
-//   struct cpu *c;
-//   for(c = cpus; c < &cpus[NCPU] && c != NULL ; c++){
-//     c->runnable_list = (struct linked_list){-1};
-//     initlock(&c->runnable_list.head_lock, "cpu_runnable_list - head lock");
-//   }
-//   initlock(&unused_list.head_lock, "unused_list - head lock");
-//   initlock(&sleeping_list.head_lock, "sleeping_list - head lock");
-//   initlock(&zombie_list.head_lock, "zombie_list - head lock");
-// }
-
 void
 initialize_proc(struct proc *p){
   p->prev_proc = -1;
@@ -155,30 +143,32 @@ proc_mapstacks(pagetable_t kpgtbl) {
 void
 procinit(void)
 {
+  // Adding all processes to UNUSED list.
   struct proc *p;
-
-  // initialize_lists();
   struct cpu *c;
-  for(c = cpus; c < &cpus[NCPU] && c != NULL ; c++){
-    c->runnable_list = (struct linked_list){-1};
-    initlock(&c->runnable_list.head_lock, "cpu_runnable_list - head lock");
-  }
-  initlock(&unused_list.head_lock, "unused_list - head lock");
-  initlock(&sleeping_list.head_lock, "sleeping_list - head lock");
-  initlock(&zombie_list.head_lock, "zombie_list - head lock");
+  int i = 0;
 
+  initlock(&sleeping_list.head_lock, "sleeping_list_head_lock");
+  initlock(&zombie_list.head_lock, "zombie_list_head_lock");
+  initlock(&unused_list.head_lock, "unused_list_head_lock");
   initlock(&pid_lock, "nextpid");
   initlock(&wait_lock, "wait_lock");
 
-  int i = 0;
+  
   for(p = proc; p < &proc[NPROC]; p++) {
       initlock(&p->lock, "proc");
       initlock(&p->list_lock, "list_lock");
       p->kstack = KSTACK((int) (p - proc));
       p->proc_ind = i;
-      initialize_proc(p);
-      append(&unused_list, p); // procinit to admit all UNUSED process entries
-      i++;
+      i=i+1;
+      p->prev_proc = -1;
+      p->next_proc = -1;
+      append(&unused_list, p); 
+  }
+
+  for(c = cpus; c < &cpus[NCPU] && c != NULL ; c++){
+    c->runnable_list = (struct linked_list){-1};
+    initlock(&c->runnable_list.head_lock, "cpu_runnable_list_head_lock");
   }
 }
 
@@ -213,11 +203,13 @@ myproc(void) {
 
 int
 allocpid() {
-  int pid;
+  int pid = 0;
 
-  do {
+  do 
+  {
     pid = nextpid;
-  } while(cas(&nextpid, pid, nextpid + 1));
+  } 
+  while (cas(&nextpid, pid, nextpid + 1));
 
   return pid;
 }
@@ -229,15 +221,18 @@ allocpid() {
 static struct proc*
 allocproc(void)
 {
+  // Removing the new process from the UNUSED entry list.
   struct proc *p;
 
   while(!isEmpty(&unused_list)){
-    p = &proc[get_head(&unused_list)];
+    p = &proc[unused_list.head];
+    // p = &proc[get_head(&unused_list)];
     acquire(&p->lock);
     if(p->state == UNUSED) {
-      remove(&unused_list, p); // choose the new process entry to initialize from the UNUSED entry list.
+      remove(&unused_list, p); 
       goto found;
-    } else {
+    }
+    else {
       release(&p->lock);
     }
   }
