@@ -43,11 +43,6 @@ inc_cpu(struct cpu *c){
   while (cas(&(c->proc_cnt), procs_num, procs_num+1));
 }
 
-void
-initialize_proc(struct proc *p){
-  p->prev_proc = -1;
-  p->next_proc = -1;
-}
 
 int
 isEmpty(struct linked_list *lst){
@@ -56,14 +51,6 @@ isEmpty(struct linked_list *lst){
   return h;
 }
 
-
-void set_prev_proc(struct proc *p, int value){
-  p->prev_proc = value; 
-}
-
-void set_next_proc(struct proc *p, int value){
-  p->next_proc = value; 
-}
 
 void 
 append(struct linked_list *lst, struct proc *p){
@@ -75,8 +62,8 @@ append(struct linked_list *lst, struct proc *p){
   else{ 
     acquire(&proc[lst->tail].list_lock);
     release(&lst->head_lock);
-    set_next_proc(&proc[lst->tail], p->proc_ind);  // update next proc of the curr tail
-    set_prev_proc(p, proc[lst->tail].proc_ind); // update the prev proc of the new proc
+    proc[lst->tail].next_proc = p->proc_ind;
+    p->prev_proc = proc[lst->tail].proc_ind; 
     release(&proc[lst->tail].list_lock);
   }
   acquire(&lst->head_lock);
@@ -94,7 +81,7 @@ remove(struct linked_list *lst, struct proc *p){
 
   if(lst->head == p->proc_ind){ // the required proc is the head
     lst->head = p->next_proc;
-    set_prev_proc(&proc[p->next_proc], -1);
+    proc[p->next_proc].prev_proc = -1;
 
     if(lst->tail == p->proc_ind){
       lst->tail = -1;
@@ -108,12 +95,13 @@ remove(struct linked_list *lst, struct proc *p){
     release(&lst->head_lock); 
     acquire(&p->list_lock);
     acquire(&proc[p->prev_proc].list_lock);
-    set_next_proc(&proc[p->prev_proc], p->next_proc);
-    set_prev_proc(&proc[p->next_proc], p->prev_proc);
+    proc[p->prev_proc].next_proc = p->next_proc;
+    proc[p->next_proc].prev_proc = p->prev_proc; 
     release(&proc[p->prev_proc].list_lock);
     release(&p->list_lock);
   }
-  initialize_proc(p);
+  p->prev_proc = -1;
+  p->next_proc = -1;
 }
 
 // Allocate a page for each process's kernel stack.
@@ -825,47 +813,17 @@ set_cpu(int cpu_num){
 // returns current CPU.
 int
 get_cpu(void){
-  // struct proc *p = myproc();
   return myproc()->last_cpu;
 }
 
 int
 min_cpu(void){
-  struct cpu *c, *min_cpu;
-// should add an if to insure numberOfCpus>0
-  min_cpu = cpus;
+  struct cpu *c;
+  struct cpu *min_cpu = cpus;
+  
   for(c = cpus + 1; c < &cpus[NCPU] && c != NULL ; c++){
     if (c->proc_cnt < min_cpu->proc_cnt)
         min_cpu = c;
   }
   return min_cpu->cpu_id;   
-}
-
-int
-cpu_process_count(int cpu_num){
-  if (cpu_num > 0 && cpu_num < NCPU && &cpus[cpu_num] != NULL) 
-    return cpus[cpu_num].proc_cnt;
-  return -1;
-}
-
-
-
-
-void
-steal_process(struct cpu *curr_c){  /*
-  struct cpu *c;
-  struct proc *p;
-  int stolen_process;
-  for(c = cpus; c < &cpus[NCPU] && c != NULL ; c++){
-    if(c != curr_c && !isEmpty(&c->runnable_list)){ 
-      do{ //???
-        stolen_process = c->runnable_list.head;
-        remove
-      }while(cas())
-    }
-  }
-  p = proc[stolen_process];
-  append(&c->runnable_list, p);
-  p->last_cpu = c->cpu_id;
-  inc_cpu(c); */
 }
