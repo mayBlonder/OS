@@ -433,16 +433,15 @@ fork(void)
   acquire(&np->lock);
   np->state = RUNNABLE;
 
-  np->last_cpu = p->last_cpu; // case BLNCFLG=OFF -> cpu = parent's cpu 
+  // if BLNCFLG is off
+  np->last_cpu = p->last_cpu;
   #ifdef ON
-    np->last_cpu = min_cpu_process_count(); // case BLNCFLG=ON -> cpu = CPU with the lowest counter value
+    np->last_cpu = min_cpu_process_count();
   #endif
   
-  struct cpu *c = &cpus[np->last_cpu];
-  inc_cpu(c);
+  inc_cpu(&cpus[np->last_cpu]);
 
-  //printf("insert fork runnable %d\n", np->index); //delete
-  append(&(c->runnable_list), np); // admit the new process to the father’s current CPU’s ready list
+  append(&(cpus[np->last_cpu].runnable_list), np); // admit the new process to the father’s current CPU’s ready list
   release(&np->lock);
 
   return pid;
