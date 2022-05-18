@@ -499,7 +499,7 @@ exit(int status)
 
   p->xstate = status;
   p->state = ZOMBIE;
-  //printf("insert exit zombie %d\n", p->index); //delete
+
   append(&zombie_list, p); // exit to admit the exiting process to the ZOMBIE list
 
   release(&wait_lock);
@@ -576,11 +576,10 @@ scheduler(void)
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
     
-    while(!isEmpty(&(c->runnable_list))){ // check whether there is a ready process in the cpu
+    while(!(c->runnable_list.head == -1)){
       p = &proc[c->runnable_list.head];
       if(p->state == RUNNABLE) {
         acquire(&p->lock);
-        // if(p->state == RUNNABLE) {  
           // Switch to chosen process.  It is the process's job
           // to release its lock and then reacquire it
           // before jumping back to us.
@@ -594,13 +593,9 @@ scheduler(void)
           // Process is done running for now.
           // It should have changed its p->state before coming back.
           c->proc = 0;
-        // }
         release(&p->lock);
       }
     } 
-    #ifdef ON
-      steal_process(c);
-    #endif
   }
 }
 
@@ -636,11 +631,10 @@ void
 yield(void)
 {
   struct proc *p = myproc();
-  struct cpu *c = mycpu();
 
   acquire(&p->lock);
   p->state = RUNNABLE;
-  append(&(c->runnable_list), p);
+  append(&(mycpu()->runnable_list), p);
   sched();
   release(&p->lock);
 }
@@ -686,7 +680,6 @@ sleep(void *chan, struct spinlock *lk)
   // Go to sleep.
   p->chan = chan;
   p->state = SLEEPING;
-  //printf("insert sleep sleep %d\n", p->index); //delete
   append(&sleeping_list, p);
 
   sched();
@@ -705,7 +698,6 @@ void
 wakeup(void *chan)
 {
   struct proc *p;
-  struct cpu *c;
 
   int curr = sleeping_list.head;
 
@@ -719,12 +711,11 @@ wakeup(void *chan)
         p->state = RUNNABLE;
 
         #ifdef ON
-          p->last_cpu = min_cpu_process_count(); // case BLNCFLG=ON -> cpu = CPU with the lowest counter value
+          p->last_cpu = min_cpu_process_count();
         #endif
-        c = &cpus[p->last_cpu];
-        inc_cpu(c);
+        inc_cpu(&cpus[p->last_cpu]);
 
-        append(&(c->runnable_list), p);
+        append(&cpus[p->last_cpu].runnable_list, p);
       }
       release(&p->lock);
     }
@@ -813,27 +804,29 @@ procdump(void){
   }
 }
 
-// assign current process to a different CPU. 
+// move process to different CPU. 
 int
 set_cpu(int cpu_num){
   struct proc *p = myproc();
-  if(cpu_num >= 0 && cpu_num < NCPU && &cpus[cpu_num] != NULL){
-    acquire(&p->lock);
-    p->last_cpu = cpu_num;
-    release(&p->lock);
-
-    yield();
-
-    return cpu_num;
+  if(cpu_num >= 0) {
+   if(cpu_num < NCPU) {
+     if(&cpus[cpu_num] != NULL){
+        acquire(&p->lock);
+        p->last_cpu = cpu_num;
+        release(&p->lock);
+        yield();
+        return cpu_num;
+      }
+    }
   }
   return -1;
 }
 
-// return the current CPU id.
+// returns current CPU.
 int
 get_cpu(void){
-  struct proc *p = myproc();
-  return p->last_cpu;
+  // struct proc *p = myproc();
+  return myproc()->last_cpu;
 }
 
 int
