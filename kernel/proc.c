@@ -29,9 +29,10 @@ extern uint cas(volatile void *addr, int expected, int newval);
 // must be acquired before any p->lock.
 struct spinlock wait_lock;
 
-struct linked_list unused_list = {-1};   // contains all UNUSED process entries.
-struct linked_list sleeping_list = {-1}; // contains all SLEEPING processes.
-struct linked_list zombie_list = {-1};   // contains all ZOMBIE processes.
+// 
+struct linked_list unused_list = {-1};   
+struct linked_list sleeping_list = {-1}; 
+struct linked_list zombie_list = {-1};
 
 void 
 inc_cpu(struct cpu *c){
@@ -556,31 +557,32 @@ wait(uint64 addr)
 void
 scheduler(void)
 {
-  struct proc *p;
   struct cpu *c = mycpu();
-  
   c->proc = 0;
+  struct proc *p;
+
   for(;;){
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
     
-    while(!(c->runnable_list.head == -1)){
+    while(!(c->runnable_list.head == -1)) {
       p = &proc[c->runnable_list.head];
       if(p->state == RUNNABLE) {
         acquire(&p->lock);
-          // Switch to chosen process.  It is the process's job
-          // to release its lock and then reacquire it
-          // before jumping back to us.
-          remove(&(c->runnable_list), p);
-          p->state = RUNNING;
-          c->proc = p;
-          p->last_cpu = c->cpu_id;
 
-          swtch(&c->context, &p->context);
+        // Switch to chosen process.  It is the process's job
+        // to release its lock and then reacquire it
+        // before jumping back to us.
+        remove(&(c->runnable_list), p);
+        p->state = RUNNING;
+        c->proc = p;
+        p->last_cpu = c->cpu_id;
 
-          // Process is done running for now.
-          // It should have changed its p->state before coming back.
-          c->proc = 0;
+        swtch(&c->context, &p->context);
+
+        // Process is done running for now.
+        // It should have changed its p->state before coming back.
+        c->proc = 0;
         release(&p->lock);
       }
     } 
@@ -794,14 +796,14 @@ procdump(void){
 
 // move process to different CPU. 
 int
-set_cpu(int cpu_num){
-  struct proc *p = myproc();
-  if(cpu_num >= 0) {
-   if(cpu_num < NCPU) {
-     if(&cpus[cpu_num] != NULL){
-        acquire(&p->lock);
-        p->last_cpu = cpu_num;
-        release(&p->lock);
+set_cpu(int cpu_num) {
+  if(cpu_num < NCPU) {
+   if(cpu_num >= 0) {
+     struct cpu *c = &cpus[cpu_num];
+     if(c != NULL) {
+        acquire(&myproc()->lock);
+        myproc()->last_cpu = cpu_num;
+        release(&myproc()->lock);
         yield();
         return cpu_num;
       }
