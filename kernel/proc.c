@@ -135,9 +135,9 @@ procinit(void)
   struct spinlock *unused_lock = &unused_list.head_lock;
 
 
-  initlock(&sleeping_list.head_lock, "sleeping_list_head_lock");
-  initlock(&zombie_list.head_lock, "zombie_list_head_lock");
-  initlock(&unused_list.head_lock, "unused_list_head_lock");
+  initlock(sleep_lock, "sleeping_list_head_lock");
+  initlock(zombie_lock, "zombie_list_head_lock");
+  initlock(unused_lock, "unused_list_head_lock");
   initlock(&pid_lock, "nextpid");
   initlock(&wait_lock, "wait_lock");
 
@@ -150,12 +150,16 @@ procinit(void)
       i=i+1;
       p->prev_proc = -1;
       p->next_proc = -1;
-      append(&unused_list, p); 
+
+      struct linked_list *add_to_unused_list = &unused_list;
+      append(add_to_unused_list, p); 
   }
 
   for(c = cpus; c < &cpus[NCPU] && c != NULL ; c++){
-    c->runnable_list = (struct linked_list){-1};
-    initlock(&c->runnable_list.head_lock, "cpu_runnable_list_head_lock");
+    struct linked_list empty_list = (struct linked_list){-1};
+    c->runnable_list = empty_list;
+    struct spinlock *runnable_head = &c->runnable_list.head_lock;
+    initlock(runnable_head, "cpu_runnable_list_head_lock");
   }
 }
 
@@ -210,12 +214,15 @@ allocproc(void)
 {
   // Removing the new process from the UNUSED entry list.
   struct proc *p;
+  int empty = -1;
 
-    while(!(unused_list.head == -1)){
+  while(!(unused_list.head == empty)) {
     p = &proc[unused_list.head];
     acquire(&p->lock);
     if(p->state == UNUSED) {
-      remove(&unused_list, p); 
+
+      struct linked_list *remove_from_unused_list = &unused_list;
+      remove(remove_from_unused_list, p); 
       goto found;
     }
     else {
