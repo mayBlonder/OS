@@ -769,7 +769,10 @@ kill(int pid)
       p->killed = 1;
       if(p->state == SLEEPING){
         // Wake process from sleep().
+
+        remove(&sleeping_list, p);
         p->state = RUNNABLE;
+        append(&cpus[p->last_cpu].runnable_list, p);
       }
       release(&p->lock);
       return 0;
