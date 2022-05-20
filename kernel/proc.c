@@ -12,6 +12,7 @@ struct cpu cpus[NCPU];
 struct proc proc[NPROC];
 
 struct proc *initproc;
+int flag = 0;
 
 int nextpid = 1;
 struct spinlock pid_lock;
@@ -134,6 +135,10 @@ procinit(void)
   struct spinlock *zombie_lock = &zombie_list.head_lock;
   struct spinlock *unused_lock = &unused_list.head_lock;
 
+  #ifdef ON
+    flag = 1;
+  #endif
+
 
   initlock(sleep_lock, "sleeping_list_head_lock");
   initlock(zombie_lock, "zombie_list_head_lock");
@@ -158,6 +163,7 @@ procinit(void)
   for(c = cpus; c < &cpus[NCPU] && c != NULL ; c++){
     struct linked_list empty_list = (struct linked_list){-1};
     c->runnable_list = empty_list;
+    c->proc_cnt = 0;
     struct spinlock *runnable_head = &c->runnable_list.head_lock;
     initlock(runnable_head, "cpu_runnable_list_head_lock");
   }
@@ -391,6 +397,21 @@ growproc(int n)
   return 0;
 }
 
+int
+min_num_procs_cpu(void){
+  struct cpu *c = 0;
+  struct cpu *min_cpu = cpus;
+  int min_cpu_proc_cnt = min_cpu->proc_cnt;
+
+  for(c = cpus + 1; c < &cpus[NCPU] && c != NULL ; c++){
+    if (c->proc_cnt < min_cpu_proc_cnt) {
+        min_cpu = c;
+        min_cpu_proc_cnt = min_cpu->proc_cnt;
+    }
+  }
+  return min_cpu_proc_cnt;   
+} 
+
 // Create a new process, copying the parent.
 // Sets up child kernel stack to return as if from fork() system call.
 int
@@ -443,11 +464,9 @@ fork(void)
   // if BLNCFLG is off
   int last_cpu = p->last_cpu; 
   np->last_cpu = last_cpu;
-  // if (flag == 1)
-  #ifdef ON
+  if (flag == 1)
     np->last_cpu = min_num_procs_cpu();
-  #endif
-  
+
   inc_cpu(&cpus[np->last_cpu]);
 
   // Adds the new process to the father’s current CPU’s runnable list or the least busy cpu.
@@ -724,9 +743,8 @@ wakeup(void *chan)
         remove(remove_from_SLEEPING_list, p);
         p->state = RUNNABLE;
 
-        #ifdef ON
+        if (flag == 1)
           p->last_cpu = min_num_procs_cpu();
-        #endif
 
         inc_cpu(&cpus[p->last_cpu]);
         append(&cpus[p->last_cpu].runnable_list, p);
@@ -840,6 +858,7 @@ set_cpu(int cpu_num) {
   return fail;
 }
 
+
 // returns current CPU.
 int
 get_cpu(void){
@@ -848,14 +867,7 @@ get_cpu(void){
   return myproc()->last_cpu;
 }
 
-int
-min_cpu(void){
-  struct cpu *c;
-  struct cpu *min_cpu = cpus;
-  
-  for(c = cpus + 1; c < &cpus[NCPU] && c != NULL ; c++){
-    if (c->proc_cnt < min_cpu->proc_cnt)
-        min_cpu = c;
-  }
-  return min_cpu->cpu_id;   
-}
+// int
+// cpu_process_count(int cpu_num) {
+//   return cpus[cpu_num].proc_cnt;
+// }
