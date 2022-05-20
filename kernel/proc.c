@@ -130,6 +130,11 @@ procinit(void)
   struct cpu *c;
   int i = 0;
 
+  struct spinlock *sleep_lock = &sleeping_list.head_lock;
+  struct spinlock *zombie_lock = &zombie_list.head_lock;
+  struct spinlock *unused_lock = &unused_list.head_lock;
+
+
   initlock(&sleeping_list.head_lock, "sleeping_list_head_lock");
   initlock(&zombie_list.head_lock, "zombie_list_head_lock");
   initlock(&unused_list.head_lock, "unused_list_head_lock");
@@ -700,27 +705,28 @@ void
 wakeup(void *chan)
 {
   struct proc *p;
-
+  int empty = -1;
   int curr = sleeping_list.head;
 
-  while(curr != -1) {
+  while(curr != empty) {
     p = &proc[curr];
-    curr = p->next_proc;
     if(p != myproc()){
       acquire(&p->lock);
       if(p->state == SLEEPING && p->chan == chan) {
-        remove(&sleeping_list, p);
+        struct linked_list *remove_from_SLEEPING_list = &sleeping_list;
+        remove(remove_from_SLEEPING_list, p);
         p->state = RUNNABLE;
 
         #ifdef ON
           p->last_cpu = min_num_procs_cpu();
         #endif
-        inc_cpu(&cpus[p->last_cpu]);
 
+        inc_cpu(&cpus[p->last_cpu]);
         append(&cpus[p->last_cpu].runnable_list, p);
       }
       release(&p->lock);
     }
+  curr = p->next_proc;
   }
 }
 
