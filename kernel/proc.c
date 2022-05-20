@@ -269,8 +269,11 @@ freeproc(struct proc *p)
   p->xstate = 0;
   p->state = UNUSED;
 
-  remove(&zombie_list, p); 
-  append(&unused_list, p); 
+  struct linked_list *remove_from_ZOMBIE_list = &zombie_list;
+  struct linked_list *add_to_UNUSED_list = &unused_list;
+
+  remove(remove_from_ZOMBIE_list, p); 
+  append(add_to_UNUSED_list, p); 
 }
 
 // Create a user page table for a given process,
@@ -495,7 +498,8 @@ exit(int status)
   p->xstate = status;
   p->state = ZOMBIE;
 
-  append(&zombie_list, p); // exit to admit the exiting process to the ZOMBIE list
+  // Add process to the ZOMBIE list.
+  append(&zombie_list, p); 
 
   release(&wait_lock);
 
@@ -676,7 +680,9 @@ sleep(void *chan, struct spinlock *lk)
   // Go to sleep.
   p->chan = chan;
   p->state = SLEEPING;
-  append(&sleeping_list, p);
+
+  struct linked_list *add_to_SLEEPING_list = &sleeping_list;
+  append(add_to_SLEEPING_list, p);
 
   sched();
 
