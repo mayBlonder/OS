@@ -222,6 +222,7 @@ allocproc(void)
 found:
   p->pid = allocpid();
   p->state = USED;
+  p->last_cpu = -1;
 
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
@@ -380,7 +381,9 @@ growproc(int n)
 int
 fork(void)
 {
-  int i, pid;
+
+  int i; 
+  int pid;
   struct proc *np;
   struct proc *p = myproc();
 
@@ -423,14 +426,17 @@ fork(void)
   np->state = RUNNABLE;
 
   // if BLNCFLG is off
-  np->last_cpu = p->last_cpu;
+  int last_cpu = p->last_cpu; 
+  np->last_cpu = last_cpu;
+  // if (flag == 1)
   #ifdef ON
-    np->last_cpu = min_cpu_process_count();
+    np->last_cpu = min_num_procs_cpu();
   #endif
   
   inc_cpu(&cpus[np->last_cpu]);
 
-  append(&(cpus[np->last_cpu].runnable_list), np); // admit the new process to the father’s current CPU’s ready list
+  // Adds the new process to the father’s current CPU’s runnable list or the least busy cpu.
+  append(&(cpus[np->last_cpu].runnable_list), np); 
   release(&np->lock);
 
   return pid;
@@ -701,7 +707,7 @@ wakeup(void *chan)
         p->state = RUNNABLE;
 
         #ifdef ON
-          p->last_cpu = min_cpu_process_count();
+          p->last_cpu = min_num_procs_cpu();
         #endif
         inc_cpu(&cpus[p->last_cpu]);
 
@@ -797,6 +803,7 @@ procdump(void){
 // move process to different CPU. 
 int
 set_cpu(int cpu_num) {
+  int fail = -1;
   if(cpu_num < NCPU) {
    if(cpu_num >= 0) {
      struct cpu *c = &cpus[cpu_num];
@@ -804,17 +811,21 @@ set_cpu(int cpu_num) {
         acquire(&myproc()->lock);
         myproc()->last_cpu = cpu_num;
         release(&myproc()->lock);
+
+        // RUNNING -> RUNNABLE
         yield();
         return cpu_num;
       }
     }
   }
-  return -1;
+  return fail;
 }
 
 // returns current CPU.
 int
 get_cpu(void){
+
+  // If process was not chosen by any cpy the value of myproc()->last_cpu is -1.
   return myproc()->last_cpu;
 }
 
